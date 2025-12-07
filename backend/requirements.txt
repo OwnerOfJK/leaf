@@ -1,0 +1,25 @@
+# FastAPI and server
+fastapi==0.124.0
+uvicorn[standard]==0.38.0
+python-multipart==0.0.20
+
+# Database
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+pgvector==0.3.6
+alembic==1.14.0
+
+# Redis and Celery
+redis==5.2.1
+celery==5.4.0
+
+# AI/ML
+openai==1.59.5
+langfuse==2.59.1
+
+# Settings management
+pydantic==2.10.5
+pydantic-settings==2.7.0
+
+# Utilities
+python-dotenv==1.0.1
