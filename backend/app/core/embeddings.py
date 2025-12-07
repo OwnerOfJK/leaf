@@ -1,14 +1,15 @@
-"""OpenAI embedding utilities."""
+"""OpenAI embedding utilities with Langfuse tracking."""
 
 from typing import List
 
-from openai import OpenAI
+from langfuse.openai import OpenAI
 
 from app.config import get_settings
 
 settings = get_settings()
 
-# Initialize OpenAI client
+# Initialize OpenAI client with Langfuse wrapper
+# This automatically tracks all OpenAI calls in Langfuse
 openai_client = OpenAI(api_key=settings.openai_api_key)
 
 # Embedding model configuration
