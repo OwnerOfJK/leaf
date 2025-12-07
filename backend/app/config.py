@@ -1,9 +1,15 @@
 """Application configuration management."""
 
 from functools import lru_cache
-from typing import Optional
+from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env file into os.environ BEFORE Settings initialization
+# This is required for Langfuse decorators (@observe) and OpenAI wrapper to work
+_env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=_env_path, override=True)
 
 
 class Settings(BaseSettings):
@@ -31,10 +37,10 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str
 
-    # Langfuse
+    # Langfuse 
     langfuse_public_key: str
     langfuse_secret_key: str
-    langfuse_host: str = "https://cloud.langfuse.com"
+    langfuse_base_url: str
 
     # Google Books API
     google_books_api_key: str
