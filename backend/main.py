@@ -5,6 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 
+# Include API routes
+from app.api.routes import feedback, recommendations, sessions
+
 settings = get_settings()
 
 # Create FastAPI application
@@ -101,9 +104,15 @@ def test_redis():
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
+app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
+app.include_router(recommendations.router, prefix="/api/sessions", tags=["recommendations"])
+app.include_router(feedback.router, prefix="/api/recommendations", tags=["feedback"])
 
-# TODO: Include API routes when implemented
-# from app.api.routes import sessions, recommendations, feedback
-# app.include_router(sessions.router, prefix="/api", tags=["sessions"])
-# app.include_router(recommendations.router, prefix="/api", tags=["recommendations"])
-# app.include_router(feedback.router, prefix="/api", tags=["feedback"])
+
+# Langfuse shutdown handler to flush remaining traces
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Flush Langfuse data on application shutdown."""
+    from app.core.langfuse_client import langfuse
+
+    langfuse.flush()
