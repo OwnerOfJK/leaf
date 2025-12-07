@@ -39,6 +39,7 @@ env/
 
 # Alembic
 alembic.ini
+*.mako
 
 # Logs
 *.log
