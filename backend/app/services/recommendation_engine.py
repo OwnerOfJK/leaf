@@ -24,9 +24,9 @@ from app.constants import (
     QUALITY_SCORE_WEIGHTS,
     SIMILARITY_THRESHOLD,
 )
-from app.core.embeddings import create_embedding, format_book_text
+from app.core.embeddings import create_embedding
 from app.models.database import Book, Recommendation
-from app.services import book_service, vector_search
+from app.services import vector_search
 
 settings = get_settings()
 # Initialize OpenAI client with Langfuse wrapper for automatic tracking

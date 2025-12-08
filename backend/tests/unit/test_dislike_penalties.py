@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from unittest.mock import MagicMock
-from app.constants import DISLIKE_PENALTY, DISLIKE_SIMILARITY_THRESHOLD
+from app.constants import DISLIKE_PENALTY
 from app.models.database import Book
 from app.services.recommendation_engine import _apply_dislike_penalties
 

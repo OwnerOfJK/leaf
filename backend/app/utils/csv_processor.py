@@ -7,6 +7,8 @@ from typing import Any
 
 import pandas as pd
 
+from app.constants import CSV_UPLOAD_MAX_SIZE_MB
+
 logger = logging.getLogger(__name__)
 
 # Goodreads CSV column names
@@ -141,12 +143,12 @@ def parse_goodreads_csv(file_path: Path) -> list[dict[str, Any]]:
         raise
 
 
-def validate_csv_file(file_path: Path, max_size_mb: int = 10) -> None:
+def validate_csv_file(file_path: Path, max_size_mb: int = CSV_UPLOAD_MAX_SIZE_MB) -> None:
     """Validate CSV file before processing.
 
     Args:
         file_path: Path to the CSV file
-        max_size_mb: Maximum allowed file size in megabytes
+        max_size_mb: Maximum allowed file size in megabytes (defaults to CSV_UPLOAD_MAX_SIZE_MB)
 
     Raises:
         FileNotFoundError: If file doesn't exist

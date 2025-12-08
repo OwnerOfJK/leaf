@@ -66,7 +66,7 @@ SIMILARITY_THRESHOLD = 0.4
 """
 Minimum cosine similarity (0.0-1.0) for relevance filtering.
 
-User's favorite books must be at least 40% similar to the query to be used
+User's favorite books must be above this similarity threshold to the query to be used
 for collaborative filtering.
 
 Tuning:
@@ -74,10 +74,9 @@ Tuning:
     - Lower (e.g., 0.3): Somewhat relevant books pass filter (more lenient)
 
 Example:
-    User has 20 coding books rated 5★
+    User has many coding books rated 5★
     Query: "fantasy with magic"
-    With threshold 0.4: Coding books excluded (similarity < 0.4)
-    Result: Collaborative filtering skipped, uses query search instead
+    Result: Coding books excluded (similarity below threshold), collaborative filtering skipped
 """
 
 MIN_RELEVANT_BOOKS = 2
@@ -90,8 +89,6 @@ is skipped entirely.
 Tuning:
     - Higher (e.g., 3): Requires more signal before using collaborative
     - Lower (e.g., 1): Uses collaborative with minimal signal
-
-Default: 2 (requires at least 2 relevant favorites)
 """
 
 HIGH_RATING_THRESHOLD = 4
@@ -101,8 +98,6 @@ Books rated at or above this threshold are considered "favorites".
 Used for:
     - Identifying books to use in collaborative filtering
     - Building LLM context (shows user's loved books)
-
-Default: 4 (books rated 4-5 stars)
 """
 
 
@@ -119,8 +114,6 @@ Used for:
     - Identifying books to avoid in recommendations
     - Building LLM context (shows user's disliked books)
     - Applying similarity penalties to candidates
-
-Default: 2 (books rated 1-2 stars)
 """
 
 DISLIKE_PENALTY = 0.5
@@ -136,30 +129,25 @@ Tuning:
     - 0.0: Complete elimination of similar books
 
 Example:
-    User rated "Twilight" 1★
-    Candidate "Midnight Sun" has similarity 0.9
-    Similarity to Twilight: 0.7 (above threshold)
-    Final similarity: 0.9 * 0.5 = 0.45 (penalized)
-
-Default: 0.5 (halves the similarity)
+    User rated a book poorly
+    Candidate is highly similar to that book (above threshold)
+    Final similarity = original_similarity * DISLIKE_PENALTY (penalized)
 """
 
 DISLIKE_SIMILARITY_THRESHOLD = 0.5
 """
 Minimum similarity to disliked books required to trigger penalty (0.0-1.0).
 
-Only books that are at least 60% similar to a disliked book will be penalized.
+Only books above this similarity threshold to a disliked book will be penalized.
 
 Tuning:
     - Higher (e.g., 0.7): Only very similar books penalized
-    - Lower (e.g., 0.5): Somewhat similar books also penalized
+    - Lower (e.g., 0.3): Somewhat similar books also penalized
 
 Example:
     User disliked "Twilight"
-    Candidate A: 70% similar → penalized (above 0.6)
-    Candidate B: 50% similar → not penalized (below 0.6)
-
-Default: 0.6 (60% similarity threshold)
+    Candidate A has high similarity to Twilight → penalized (above threshold)
+    Candidate B has low similarity to Twilight → not penalized (below threshold)
 """
 
 
@@ -173,8 +161,6 @@ Default number of candidate books to retrieve before LLM selection.
 
 The pipeline retrieves this many candidates through vector search and
 collaborative filtering, then the LLM selects the top 3 from these candidates.
-
-Default: 60 candidates → LLM selects 3
 """
 
 COLLABORATIVE_FILTERING_LIMIT = 10
@@ -183,8 +169,6 @@ Maximum number of books to retrieve via collaborative filtering.
 
 When the user has relevant favorites, this many books similar to those
 favorites are retrieved.
-
-Default: 10 books
 """
 
 
@@ -197,8 +181,6 @@ MAX_FAVORITES_IN_CONTEXT = 5
 Maximum number of user's favorite books to show in LLM context.
 
 Shows the user's top-rated books to help LLM understand preferences.
-
-Default: 5 books
 """
 
 MAX_DISLIKES_IN_CONTEXT = 3
@@ -206,8 +188,6 @@ MAX_DISLIKES_IN_CONTEXT = 3
 Maximum number of user's disliked books to show in LLM context.
 
 Shows books the user rated poorly to help LLM avoid similar recommendations.
-
-Default: 3 books
 """
 
 CANDIDATE_DESCRIPTION_MAX_LENGTH = 200
@@ -215,8 +195,33 @@ CANDIDATE_DESCRIPTION_MAX_LENGTH = 200
 Maximum length of book descriptions shown to LLM for each candidate.
 
 Longer descriptions are truncated to this length.
+"""
 
-Default: 200 characters
+
+# =============================================================================
+# CSV PROCESSING CONFIGURATION
+# =============================================================================
+
+MAX_DESCRIPTION_LENGTH = 3000
+"""
+Maximum length of book descriptions stored in database.
+
+Longer descriptions from Google Books API are truncated to this length
+to prevent database bloat and optimize embedding generation.
+"""
+
+CSV_UPLOAD_MAX_SIZE_MB = 10
+"""
+Maximum CSV file size in megabytes.
+
+Larger files are rejected to prevent memory issues during processing.
+"""
+
+CSV_PROGRESS_UPDATE_INTERVAL = 10
+"""
+Update CSV processing progress every N books.
+
+Also extends session TTL at this interval to keep session alive during long processing.
 """
 
 

@@ -3,9 +3,9 @@
 import logging
 from pathlib import Path
 
-from langfuse.decorators import observe
 from sqlalchemy import or_
 
+from app.constants import CSV_PROGRESS_UPDATE_INTERVAL, MAX_DESCRIPTION_LENGTH
 from app.core.database import SessionLocal
 from app.core.embeddings import create_embedding, format_book_text
 from app.core.redis_client import session_manager
@@ -15,8 +15,6 @@ from app.utils.csv_processor import parse_goodreads_csv, validate_csv_file
 from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
-
-MAX_DESCRIPTION_LENGTH = 3000
 
 @celery_app.task(name="app.workers.tasks.process_csv_upload", bind=True)
 def process_csv_upload(self, session_id: str, file_path: str) -> dict:
@@ -71,8 +69,8 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
         # Process each book
         for idx, book_data in enumerate(books_from_csv, 1):
             try:
-                # Extend session TTL every 10 books to keep it alive during processing
-                if idx % 10 == 0:
+                # Extend session TTL periodically to keep it alive during processing
+                if idx % CSV_PROGRESS_UPDATE_INTERVAL == 0:
                     session_manager.extend_session_ttl(session_id)
                     logger.debug(f"Extended session TTL at book {idx}/{total_books}")
 
