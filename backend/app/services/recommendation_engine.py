@@ -108,7 +108,7 @@ def _retrieve_candidates(
     db: Session,
     query: str,
     user_book_ids: list[int] | None = None,
-    top_k: int = 20,
+    top_k: int = 60,
 ) -> list[Book]:
     """Retrieve candidate books using vector search.
 
@@ -215,11 +215,22 @@ Select the top 3 books that best match the user's query. Return as JSON array:
         response_format={"type": "json_object"},
     )
 
-    # Parse response
-    result = json.loads(response.choices[0].message.content)
+    # Parse response with error handling
+    try:
+        result = json.loads(response.choices[0].message.content)
+    except (json.JSONDecodeError, KeyError, IndexError) as e:
+        raise ValueError(f"Failed to parse LLM response: {e}")
 
     # Handle both array and object with "recommendations" key
     recommendations = result if isinstance(result, list) else result.get("recommendations", [])
+
+    if not recommendations:
+        raise ValueError("LLM returned empty recommendations")
+
+    # Validate recommendation structure
+    for rec in recommendations[:3]:
+        if "book_id" not in rec or "confidence_score" not in rec or "explanation" not in rec:
+            raise ValueError(f"Invalid recommendation structure: {rec}")
 
     # Add rank to each recommendation
     for i, rec in enumerate(recommendations[:3], 1):
