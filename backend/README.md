@@ -2,6 +2,17 @@
 
 FastAPI backend for the Leaf book recommendation system.
 
+**Status:** Production-ready (v2.0.0) - Advanced RAG pipeline with personalization features
+
+**Key Features:**
+- **Advanced RAG Pipeline** with quality scoring, semantic filtering, and dislike penalties
+- **Dynamic Collaborative Filtering** that adapts based on query relevance
+- **Async CSV Processing** for Goodreads library imports via Celery
+- **Google Books API Integration** with rate limiting and metadata enrichment
+- **Full Langfuse Observability** with hierarchical tracing and user feedback
+- **Redis Session Management** with 1-hour TTL
+- **Comprehensive Test Coverage** (unit + integration tests)
+
 ## Quick Start
 
 ### 1. Install Dependencies
@@ -55,26 +66,44 @@ uvicorn main:app --reload
 - Interactive Docs: http://localhost:8000/docs
 - Alternative Docs: http://localhost:8000/redoc
 
-## Testing the Backend
-
-### Integration Tests
-
-Run the comprehensive test suite:
+### 6. Start Celery Worker (For CSV Upload Feature)
 
 ```bash
-# Make sure server is running first
-uvicorn main:app --reload
-
-# In another terminal
-python test_comprehensive.py
+# In a separate terminal
+celery -A app.workers.celery_app worker --loglevel=info
 ```
 
-The test suite validates:
-1. **Infrastructure** - Database (pgvector), Redis connectivity
-2. **Langfuse Integration** - Direct testing of `@observe()` decorators and OpenAI wrapper
-3. **End-to-End API Flow** - Session creation → Recommendations → Feedback
+This worker processes CSV uploads asynchronously. Without it, CSV upload functionality will queue tasks but not process them.
 
-After tests complete, check your Langfuse dashboard for traces.
+## Testing the Backend
+
+**Prerequisites**: Make sure all services are running (see [Quick Start](#quick-start) section above).
+
+### Run Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run unit tests only
+pytest tests/unit/ -v
+
+# Run integration tests only
+pytest tests/integration/ -v
+
+# Run specific test file
+pytest tests/unit/test_quality_scoring.py -v
+
+# Run with coverage report
+pytest --cov=app --cov-report=html
+open htmlcov/index.html  # View report
+```
+
+**Test Coverage:**
+- **26 unit tests**: Quality scoring, semantic filtering, dynamic weights, dislike penalties, LLM context
+- **Integration tests**: Infrastructure validation, Langfuse tracing, end-to-end API flow, CSV processing
+
+After running tests, check your Langfuse dashboard for traces.
 
 ### Basic Endpoints
 ```bash
@@ -130,23 +159,38 @@ backend/
 │   │   ├── database.py      ✓ Book & Recommendation ORM models
 │   │   └── schemas.py       ✓ Pydantic request/response schemas
 │   ├── api/routes/          ✓ API endpoints (complete)
-│   │   ├── sessions.py      ✓ Session management
+│   │   ├── sessions.py      ✓ Session management + CSV upload
 │   │   ├── recommendations.py ✓ Recommendation generation
 │   │   └── feedback.py      ✓ User feedback submission
 │   ├── services/            ✓ Business logic (complete)
 │   │   ├── recommendation_engine.py ✓ RAG pipeline with Langfuse
 │   │   ├── vector_search.py ✓ pgvector cosine similarity
-│   │   └── book_service.py  ✓ Book CRUD operations
-│   └── workers/             ⚠️ To be implemented (Celery for CSV)
+│   │   ├── book_service.py  ✓ Book CRUD operations
+│   │   └── google_books_api.py ✓ Google Books API integration
+│   ├── utils/               ✓ Utilities (complete)
+│   │   └── csv_processor.py ✓ Goodreads CSV parsing
+│   └── workers/             ✓ Async task processing (complete)
+│       ├── celery_app.py    ✓ Celery configuration
+│       └── tasks.py         ✓ CSV processing task
 ├── scripts/                 ✓ Database utilities
 │   ├── seed_books.py       ✓ Seed sample books for testing
 │   ├── clear_db.py         ✓ Clear all data (preserve schema)
 │   └── reset_db.py         ✓ Drop & recreate schema
+├── tests/                   ✓ Test suites
+│   ├── unit/               ✓ Unit tests (26 tests)
+│   │   ├── test_quality_scoring.py
+│   │   ├── test_semantic_filtering.py
+│   │   ├── test_dynamic_weights.py
+│   │   ├── test_dislike_penalties.py
+│   │   └── test_llm_context.py
+│   ├── integration/        ✓ Integration tests
+│   │   ├── test_integration_pipeline.py
+│   │   └── test_api.py
+│   └── data/               ✓ Test data files
 ├── alembic/                 ✓ Database migrations
 │   └── versions/
 │       └── 001_initial_migration.py ✓ Applied
 ├── main.py                  ✓ FastAPI app + test endpoints
-├── test_comprehensive.py    ✓ Integration tests
 ├── requirements.txt         ✓ All dependencies
 ├── .env                     ✓ Environment configuration
 └── README.md                ✓ This file
@@ -154,67 +198,65 @@ backend/
 
 ## Current Status
 
-### ✅ Fully Functional (v0.8.0)
+### ✅ Production-Ready (v2.0.0)
 
-**Database Layer:**
-- [x] PostgreSQL 16 with pgvector extension running
-- [x] SQLAlchemy 2.0 engine with connection pooling
-- [x] Context manager pattern for automatic commit/rollback
-- [x] Database models: `Book` and `Recommendation`
-- [x] Migrations applied successfully
-- [x] IVFFlat vector index for cosine similarity search
+**Advanced RAG Pipeline:**
+- [x] Quality scoring system (metadata-based ranking)
+- [x] Semantic filtering (query-relevant favorites only)
+- [x] Dynamic collaborative weighting (adapts to signal strength)
+- [x] Dislike penalty system (avoids books similar to 1-2★ ratings)
+- [x] Enhanced LLM context (includes user preferences and reading history)
+- [x] Full Langfuse observability with hierarchical tracing
 
-**Cache Layer:**
-- [x] Redis 7 running and tested
-- [x] `SessionManager` class with full CRUD operations
-- [x] Automatic TTL management (1-hour sessions)
-- [x] CSV status tracking support
-- [x] Session metadata support
+**Core Infrastructure:**
+- [x] PostgreSQL 16 with pgvector extension (IVFFlat index for vector search)
+- [x] Redis 7 for session management (1-hour TTL with auto-extension)
+- [x] SQLAlchemy 2.0 with context manager pattern
+- [x] Celery for async CSV processing with progress tracking
 
-**AI/ML Integration:**
-- [x] OpenAI client configured with Langfuse wrapper
-- [x] Embedding utilities (single + batch processing)
-- [x] Langfuse client initialized
-- [x] RAG pipeline with full `@observe` tracing
+**API & Services:**
+- [x] FastAPI with CORS, Pydantic validation, and interactive docs (Swagger UI)
+- [x] Session management with CSV upload support (multipart/form-data)
+- [x] Recommendation generation with personalized explanations
+- [x] User feedback submission (linked to Langfuse traces)
+- [x] Google Books API integration with rate limiting and exponential backoff
 
-**API Layer:**
-- [x] FastAPI application with CORS
-- [x] Pydantic schemas for all API contracts
-- [x] Health check endpoints
-- [x] Database and Redis test endpoints
-- [x] Interactive API documentation (Swagger UI)
-- [x] Session management endpoints
-- [x] Recommendation generation endpoint
-- [x] Feedback submission endpoint
+**Testing & Configuration:**
+- [x] **26 unit tests** covering all advanced features (quality scoring, semantic filtering, dynamic weights, dislike penalties, LLM context)
+- [x] **2 integration test suites** (core API flow + CSV upload workflow)
+- [x] **Centralized configuration** in `app/constants.py` with validation
 
-**Services Layer:**
-- [x] `recommendation_engine.py` - Complete RAG pipeline with Langfuse
-- [x] `vector_search.py` - pgvector cosine similarity queries
-- [x] `book_service.py` - Book CRUD operations
+### Test Organization
 
-**Utilities:**
-- [x] `scripts/seed_books.py` - Seed 10 sample books
-- [x] `scripts/clear_db.py` - Clear all data
-- [x] `scripts/reset_db.py` - Drop & recreate schema
+Tests are organized into unit and integration categories:
 
-**Testing:**
-- [x] `test_comprehensive.py` - Integration test suite
-  - Infrastructure validation (DB, Redis, Langfuse)
-  - Direct Langfuse integration testing
-  - End-to-end API flow testing
+```
+tests/
+├── unit/                       # Fast, isolated tests (no external dependencies)
+│   ├── test_quality_scoring.py
+│   ├── test_semantic_filtering.py
+│   ├── test_dynamic_weights.py
+│   ├── test_dislike_penalties.py
+│   └── test_llm_context.py
+└── integration/                # Require services (DB, Redis, API)
+    ├── test_integration_pipeline.py
+    └── test_api.py
+```
 
-### ⚠️ Not Yet Implemented
+**Run tests:**
+```bash
+# All tests
+pytest
 
-**Workers:**
-- [ ] `celery_app.py` - Celery configuration
-- [ ] `tasks.py` - Async CSV processing task
-- [ ] CSV upload endpoint
-- [ ] CSV processing status endpoint
+# Unit tests only (fast)
+pytest tests/unit/ -v
 
-**Optional Enhancements:**
-- [ ] `session_service.py` - Advanced session orchestration
-- [ ] `csv_processor.py` - Goodreads CSV parsing
-- [ ] `google_books_api.py` - Google Books API integration for CSV uploads
+# Integration tests only
+pytest tests/integration/ -v
+
+# With coverage
+pytest --cov=app --cov-report=html
+```
 
 ## Database Schema
 
@@ -253,43 +295,241 @@ Stores generated recommendations with Langfuse trace linking.
 
 **Retention:** 30-day auto-cleanup (to be implemented via scheduled job)
 
-## RAG Pipeline Architecture
+## Advanced RAG Pipeline
 
-The recommendation engine (`app/services/recommendation_engine.py`) implements a 4-step RAG pipeline with full Langfuse tracing:
+The recommendation engine (`app/services/recommendation_engine.py`) implements a sophisticated 4-stage pipeline with personalization features:
 
-### 1. Query Understanding (`_build_enhanced_query`)
-Combines user's initial query with optional follow-up answers into a single enhanced query string.
+### Pipeline Stages
 
-### 2. Retrieval (`_retrieve_candidates`)
-- Creates embedding for enhanced query using OpenAI text-embedding-3-small
-- Performs vector search using pgvector cosine similarity
-- If user uploaded CSV: searches for books similar to their reading history
-- Returns top 20 candidate books
+**1. Query Understanding** - Combines user's query with follow-up answers
 
-### 3. Generation (`_generate_with_llm`)
-- Formats candidate books with metadata (title, author, description, categories)
-- Sends to GPT-4o-mini with system prompt instructing it to select top 3 books
-- LLM returns JSON with confidence scores (0-100) and explanations
-- Uses `response_format={"type": "json_object"}` for structured output
+**2. Intelligent Retrieval** with multiple enhancement layers:
+- **Semantic Filtering**: Filters user's favorites by query relevance (prevents unrelated 5★ books from dominating)
+- **Dynamic Collaborative Weighting**: Adjusts collaborative filtering strength based on signal quality (2+ relevant books required)
+- **Quality Scoring**: Re-ranks candidates based on metadata richness (description, categories, ratings)
+- **Dislike Penalties**: Penalizes books similar to user's 1-2★ ratings (requires 2+ dislikes, 60% similarity threshold)
 
-### 4. Storage (`_store_recommendations`)
-- Saves recommendations to PostgreSQL
-- Links to Langfuse trace_id for observability
-- Returns recommendations with full book details
+**3. LLM Generation** - GPT-4o-mini selects top 3 books with personalized explanations that reference user's reading history
 
-**Langfuse Tracing:**
-All steps are decorated with `@observe()`, creating a hierarchical trace:
+**4. Storage** - Saves recommendations to PostgreSQL with Langfuse trace_id for feedback tracking
+
+### Key Enhancements
+
+**Quality Scoring**: Books are scored 0.0-1.0 based on metadata completeness:
+- Description (50%): Long = 0.5, Short = 0.2
+- Categories (20%): Multiple = 0.2, Single = 0.1
+- Ratings (20%): 100+ = 0.2, 10+ = 0.1
+- Other (10%): page_count + publisher
+
+**Semantic Filtering**: Only uses user's favorites that are semantically relevant to current query (40% similarity threshold)
+
+**Dynamic Weighting**: Collaborative filtering weight scales from 0.0 (no CSV) to 0.5 (5+ relevant favorites)
+
+**Dislike Penalties**: Books >60% similar to user's dislikes have similarity halved
+
+### Configuration Parameters
+
+All tunable parameters are centralized in `app/constants.py`:
+
+```python
+# Semantic Filtering
+SIMILARITY_THRESHOLD = 0.4       # Min similarity for relevance filtering
+MIN_RELEVANT_BOOKS = 2           # Min relevant books for collaborative filtering
+
+# Rating Thresholds
+HIGH_RATING_THRESHOLD = 4        # Defines "favorites" (4-5 stars)
+DISLIKE_THRESHOLD = 2            # Defines "dislikes" (1-2 stars)
+
+# Dislike Penalties
+DISLIKE_PENALTY = 0.5            # Multiplier (halves similarity)
+DISLIKE_SIMILARITY_THRESHOLD = 0.6  # Only penalize if >60% similar
+
+# Retrieval
+DEFAULT_TOP_K = 20               # Candidates before LLM selection
+COLLABORATIVE_FILTERING_LIMIT = 10  # Max collaborative results
+```
+
+**Tuning Examples:**
+- Stricter filtering: `SIMILARITY_THRESHOLD = 0.5` (only very relevant books)
+- Harsher penalties: `DISLIKE_PENALTY = 0.2` (near-elimination of similar books)
+- More collaborative: `MIN_RELEVANT_BOOKS = 1` (use collaborative with fewer books)
+
+### Langfuse Tracing
+
+All stages are fully traced with `@observe()` decorators:
 ```
 generate_recommendations (trace)
 ├─ _build_enhanced_query (span)
 ├─ _retrieve_candidates (span)
-│  └─ create_embedding (generation - OpenAI API call)
+│  ├─ _filter_relevant_books (span) - Semantic filtering
+│  ├─ create_embedding (generation)
+│  ├─ _apply_quality_scoring (span) - Quality re-ranking
+│  └─ _apply_dislike_penalties (span) - Penalty application
 ├─ _generate_with_llm (span)
-│  └─ chat.completions.create (generation - GPT-4o-mini call)
+│  └─ chat.completions.create (generation - GPT-4o-mini)
 └─ _store_recommendations (span)
 ```
 
 User feedback (like/dislike) is sent to Langfuse as scores linked to the trace.
+
+## Recommendation Flow: From Query to Results
+
+This section explains how the system generates personalized book recommendations through a multi-stage refinement process.
+
+### 1. Initial Retrieval (Vector Search)
+
+When a user submits a query, the system:
+- Creates an embedding for the query using OpenAI text-embedding-3-small
+- Performs two parallel vector searches using pgvector cosine similarity:
+  - **Query-based search**: Finds books semantically similar to the query
+  - **Collaborative search** (if CSV uploaded): Finds books similar to user's reading history
+- Retrieves 20 initial candidate books
+
+**Example**: User queries "fantasy with magic systems"
+- Query embedding captures semantic meaning of "fantasy" + "magic systems"
+- Vector search returns books with similar themes in their embeddings
+
+### 2. Semantic Filtering (Query-Relevant Favorites)
+
+**Problem**: If a user has 20 coding books rated 5★ but queries for fantasy, we don't want coding books to dominate recommendations.
+
+**Solution**: Filter user's favorites by semantic relevance to current query
+- Calculate cosine similarity between query embedding and each of user's high-rated books (4-5★)
+- Only use favorites with ≥40% similarity to query (`SIMILARITY_THRESHOLD = 0.4`)
+- Require minimum 2 relevant books to activate collaborative filtering (`MIN_RELEVANT_BOOKS = 2`)
+
+**Example**:
+- User has 20 coding books (5★) + 3 fantasy books (5★)
+- Query: "fantasy with magic systems"
+- Only the 3 fantasy books pass semantic filter (coding books filtered out)
+- Result: Collaborative search uses only relevant fantasy favorites
+
+### 3. Quality Scoring (Metadata-Based Re-ranking)
+
+**Problem**: Some books have rich metadata (long descriptions, multiple categories, many ratings) while others are sparse.
+
+**Solution**: Score each candidate 0.0-1.0 based on metadata quality
+- **Description** (50%): Long (>100 chars) = 0.5, Short = 0.2
+- **Categories** (20%): Multiple = 0.2, Single = 0.1
+- **Ratings** (20%): 100+ ratings = 0.2, 10+ ratings = 0.1
+- **Other** (10%): page_count + publisher = 0.05 each
+
+**Adjustment**: Multiply similarity score by quality score
+- Book A: similarity=0.85, quality=0.3 → adjusted=0.255 (sparse metadata)
+- Book B: similarity=0.70, quality=1.0 → adjusted=0.70 (rich metadata)
+- Result: Book B ranks higher despite lower raw similarity
+
+### 4. Dislike Penalties (Avoid Similar Books)
+
+**Problem**: User rated "Twilight" 1★ but system might recommend similar books in the same series.
+
+**Solution**: Penalize candidates similar to user's dislikes (1-2★ ratings)
+- Requires minimum 2 dislikes to activate (filters outliers)
+- Calculate similarity between each candidate and each disliked book
+- If similarity ≥60% (`DISLIKE_SIMILARITY_THRESHOLD = 0.6`), apply penalty
+- Penalty: Multiply similarity by 0.5 (`DISLIKE_PENALTY = 0.5`)
+
+**Example**:
+- User rated "Twilight" 1★
+- Candidate "Midnight Sun" has 70% similarity to Twilight
+- Original similarity: 0.90 → Penalized: 0.90 × 0.5 = 0.45
+- Result: Book ranks much lower but isn't eliminated (LLM has final say)
+
+### 5. LLM Generation (Intelligent Selection)
+
+After refinement, the top 20 candidates are sent to GPT-4o-mini with:
+- **User context**:
+  - Books they loved (4-5★) with titles/authors
+  - Books they disliked (1-2★) with warning to avoid similar themes
+  - Rating distribution (5★: X, 4★: Y, etc.)
+- **Candidate metadata**: title, author, description, categories, ratings, publication year
+- **Instruction**: Select top 3 books with confidence scores and personalized explanations
+
+**LLM's job**: Make final intelligent decision considering:
+- How well each book matches the query
+- Similarity to books user loved
+- Dissimilarity from books user disliked
+- Quality and relevance signals from earlier stages
+
+**Example explanation**: "Like The Martian and Project Hail Mary, this book balances hard sci-fi with deeply human characters. Unlike Neuromancer's dense cyberpunk style, it offers accessible storytelling with warmth."
+
+### 6. Storage & Feedback Loop
+
+Final recommendations are:
+- Stored in PostgreSQL with Langfuse `trace_id`
+- Returned to user with full book details
+- User feedback (like/dislike) sent to Langfuse as scores linked to trace
+- Enables tracking recommendation quality over time
+
+### Dynamic Collaborative Weighting
+
+The system intelligently adjusts how much to weight collaborative filtering vs. query search:
+
+| Scenario | Collaborative Weight | Behavior |
+|----------|---------------------|----------|
+| No CSV uploaded | 0.0 (0%) | Pure semantic search on query |
+| CSV with no favorites | 0.1-0.2 (10-20%) | Weak signal from all books |
+| CSV with favorites but none relevant to query | 0.15-0.3 (15-30%) | Moderate signal from all favorites |
+| CSV with 2+ relevant favorites | 0.2-0.5 (20-50%) | Strong signal from relevant favorites |
+
+**Example**: If user has 5 relevant favorites, weight = 0.5
+- 10 books from collaborative search (50%)
+- 10 books from query search (50%)
+
+This prevents:
+- Over-reliance on collaborative when signal is weak
+- Ignoring user preferences when signal is strong
+- Recommending unrelated books based on irrelevant favorites
+
+### Why This Approach Works
+
+1. **Graceful degradation**: Works perfectly without CSV, improves with better data
+2. **Context-aware**: Only uses user data relevant to current query
+3. **Quality-first**: Prioritizes books with rich, reliable metadata
+4. **User-respecting**: Actively avoids books similar to dislikes
+5. **Transparent**: Full Langfuse tracing shows exact decision process
+6. **Tunable**: All thresholds configurable in `app/constants.py`
+
+## CSV Processing Workflow
+
+The backend supports async CSV upload for Goodreads library exports (`app/workers/tasks.py`):
+
+### 1. Upload & Validation
+- User uploads CSV via `POST /api/sessions/create` (multipart/form-data)
+- Validates file extension and size (max 10MB)
+- Saves to temporary location (`/tmp/leaf_csv_uploads/{session_id}.csv`)
+- Sets CSV status to "pending" in Redis
+
+### 2. Async Processing (Celery Task)
+- Task queued in Redis, picked up by Celery worker
+- Parses CSV with Goodreads-specific format handling:
+  - Cleans ISBN values (removes `="..."` Excel formula notation)
+  - Extracts title, author, user rating (0-5)
+  - Validates and filters books without ISBNs
+- Status updated to "processing"
+
+### 3. Book Enrichment (Per Book)
+- Checks if book exists in PostgreSQL (by ISBN or ISBN13)
+- If not found:
+  - Fetches metadata from Google Books API
+  - Exponential backoff for rate limiting (429 errors)
+  - Generates embedding for title + author + description
+  - Inserts into PostgreSQL with rich metadata
+- Updates progress in Redis every 10 books
+- Extends session TTL to prevent expiration during processing
+
+### 4. Session Update
+- Stores user's book IDs and ratings in Redis session
+- Sets `csv_uploaded: true` and `books_from_csv: [...]`
+- Updates status to "completed" (or "failed" on error)
+- Deletes temporary CSV file
+
+### 5. Frontend Polling
+- Frontend polls `GET /api/sessions/{id}/status` every 5 seconds
+- Receives progress: `{books_total, books_processed, new_books_added}`
+- Proceeds to questions page when status is "completed"
+
+**Processing time:** ~3-5 minutes for 100 books (depends on Google Books API rate limits)
 
 ## Core Infrastructure Details
 
@@ -360,9 +600,12 @@ python scripts/clear_db.py                 # Clear all data (keep schema)
 python scripts/reset_db.py                 # Drop & recreate schema (DESTRUCTIVE)
 
 # Testing
-python test_comprehensive.py               # Run integration tests
+pytest                                     # Run all tests
+pytest tests/unit/ -v                      # Run unit tests only
+pytest tests/integration/ -v               # Run integration tests only
+pytest --cov=app --cov-report=html         # Generate coverage report
 
-# When Celery is implemented
+# Celery worker (for CSV processing)
 celery -A app.workers.celery_app worker --loglevel=info
 ```
 
@@ -373,8 +616,9 @@ celery -A app.workers.celery_app worker --loglevel=info
 - `GET /health` - Detailed infrastructure status (DB + Redis)
 
 ### Session Management
-- `POST /api/sessions/create` - Create new session with initial query
+- `POST /api/sessions/create` - Create new session with initial query (supports CSV upload via multipart/form-data)
 - `POST /api/sessions/{session_id}/answers` - Submit follow-up answers
+- `GET /api/sessions/{session_id}/status` - Get CSV processing status and progress
 
 ### Recommendations
 - `GET /api/sessions/{session_id}/recommendations` - Get top 3 book recommendations
@@ -401,6 +645,10 @@ LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 GOOGLE_BOOKS_API_KEY=AIza...
 
+# Celery (for CSV processing)
+CELERY_BROKER_URL=redis://localhost:6379/1
+CELERY_RESULT_BACKEND=redis://localhost:6379/2
+
 # Optional (have defaults)
 REDIS_SESSION_TTL=3600                      # 1 hour
 ENVIRONMENT=development
@@ -418,25 +666,27 @@ Environment variables are loaded in `app/config.py` using a hybrid approach:
 
 This ensures both pydantic-settings validation and Langfuse's global decorator instance work correctly.
 
-## Next Implementation Steps
+## Optional Enhancements
 
-The core recommendation system is complete. Optional enhancements:
+The backend is production-ready with all planned features implemented. Future improvements could include:
 
-1. **CSV Upload Feature** (Celery workers)
-   - `app/workers/celery_app.py` - Celery configuration
-   - `app/workers/tasks.py` - Async CSV processing
-   - `POST /api/sessions/create` - Accept CSV file upload
-   - `GET /api/sessions/{id}/status` - Poll CSV processing status
+**Performance & Scaling:**
+- Recommendation result caching (Redis/Memcached)
+- Batch processing for multiple users
+- Database read replicas for query scaling
+- CDN integration for book cover images
 
-2. **Google Books API Integration**
-   - `app/services/google_books_api.py` - Fetch book metadata by ISBN
-   - Enrich database with more books from user CSVs
+**Analytics & A/B Testing:**
+- A/B testing framework for recommendation algorithms
+- User behavior analytics dashboard
+- Recommendation quality metrics tracking
+- API usage tracking and rate limiting
 
-3. **Advanced Features**
-   - Follow-up question generation based on query
-   - More sophisticated LLM prompting
-   - A/B testing different recommendation algorithms
-   - Recommendation explanation improvements
+**Advanced Features:**
+- Dynamic follow-up question generation
+- Multi-modal recommendations (book covers, sample text)
+- Genre-specific tuning (different thresholds per category)
+- Temporal decay (weight recent books more heavily)
 
 ## Troubleshooting
 
@@ -480,18 +730,21 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Implementation Progress
+## System Architecture Summary
 
 ```
 Foundation & Infrastructure:  ████████████████████ 100%
-Database Schema & Models:     ████████████████████ 100%
-Core Services:                ████████████████████ 100%
-API Routes:                   ████████████████████ 100%
-Business Logic (Services):    ████████████████████ 100%
-Testing:                      ████████████████████ 100%
-Background Workers (Celery):  ░░░░░░░░░░░░░░░░░░░░   0%
+Advanced RAG Pipeline:        ████████████████████ 100%
+API & Services:               ████████████████████ 100%
+Background Workers:           ████████████████████ 100%
+Testing & Configuration:      ████████████████████ 100%
 
-Overall:                      ██████████████████░░  85%
+Overall:                      ████████████████████ 100% (v2.0.0)
 ```
 
-The **core recommendation system is production-ready**! The RAG pipeline, API endpoints, and Langfuse integration are fully functional. CSV upload via Celery workers is optional.
+**All features implemented and tested:**
+- ✓ Advanced RAG pipeline (quality scoring, semantic filtering, dynamic weights, dislike penalties)
+- ✓ Full Langfuse observability with hierarchical tracing
+- ✓ Async CSV processing with Google Books API integration
+- ✓ Comprehensive test coverage (26 unit tests + 2 integration test suites)
+- ✓ Production-ready configuration and documentation
