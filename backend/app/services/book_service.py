@@ -57,18 +57,34 @@ def create_book(
     description: str | None = None,
     categories: list[str] | None = None,
     cover_url: str | None = None,
+    isbn13: str | None = None,
+    page_count: int | None = None,
+    publisher: str | None = None,
+    publication_year: int | None = None,
+    language: str | None = None,
+    average_rating: float | None = None,
+    ratings_count: int | None = None,
+    data_source: str | None = None,
 ) -> Book:
-    """Create a new book record with embedding.
+    """Create a new book record with embedding and rich metadata.
 
     Args:
         db: Database session
-        isbn: Book ISBN (must be unique)
+        isbn: Book ISBN-10 (must be unique)
         title: Book title
         author: Book author
         embedding: 1536-dimensional embedding vector
         description: Book description (optional)
         categories: List of genre/category tags (optional)
         cover_url: URL to book cover image (optional)
+        isbn13: Book ISBN-13 (optional)
+        page_count: Number of pages (optional)
+        publisher: Publisher name (optional)
+        publication_year: Year of publication (optional)
+        language: Language code (e.g., 'en') (optional)
+        average_rating: Global average rating 0-5 (optional)
+        ratings_count: Number of ratings (optional)
+        data_source: Data source identifier (optional)
 
     Returns:
         Created Book instance
@@ -78,12 +94,20 @@ def create_book(
     """
     book = Book(
         isbn=isbn,
+        isbn13=isbn13,
         title=title,
         author=author,
         description=description,
         categories=categories,
+        page_count=page_count,
+        publisher=publisher,
+        publication_year=publication_year,
+        language=language,
+        average_rating=average_rating,
+        ratings_count=ratings_count,
         cover_url=cover_url,
         embedding=embedding,
+        data_source=data_source,
     )
     db.add(book)
     db.flush()  # Get ID without committing transaction

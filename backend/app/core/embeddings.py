@@ -56,17 +56,42 @@ def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
     return [item.embedding for item in response.data]
 
 
-def format_book_text(title: str, author: str, description: str | None = None) -> str:
-    """Format book metadata into text for embedding.
+def format_book_text(
+    title: str,
+    author: str,
+    description: str | None = None,
+    categories: list[str] | None = None,
+    publication_year: int | None = None,
+    page_count: int | None = None,
+) -> str:
+    """Format book metadata into text for embedding (Phase 1 enhanced format).
+
+    Creates a rich text representation including title, author, description,
+    categories, publication year, and page count for better semantic search.
 
     Args:
         title: Book title
         author: Book author
-        description: Book description (optional)
+        description: Book description (optional, truncated to 2000 chars)
+        categories: List of genre/category tags (optional)
+        publication_year: Year of publication (optional)
+        page_count: Number of pages (optional)
 
     Returns:
-        Formatted text string for embedding
+        Formatted text string optimized for embedding generation
     """
+    parts = [f"{title} by {author}"]
+
     if description:
-        return f"{title} by {author}. {description}"
-    return f"{title} by {author}"
+        parts.append(description)
+
+    if categories:
+        parts.append(f"Genres: {', '.join(categories)}")
+
+    if publication_year:
+        parts.append(f"Published: {publication_year}")
+
+    if page_count:
+        parts.append(f"Pages: {page_count}")
+
+    return ". ".join(parts)
