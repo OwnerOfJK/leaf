@@ -75,9 +75,16 @@ def search_similar_to_books(
     if not books:
         return []
 
+    # Filter books with valid embeddings
+    books_with_embeddings = [book for book in books if book.embedding is not None]
+
+    if not books_with_embeddings:
+        # No books have embeddings - cannot compute average
+        return []
+
     # Calculate average embedding
     avg_embedding = [
-        sum(book.embedding[i] for book in books if book.embedding is not None) / len(books)
+        sum(book.embedding[i] for book in books_with_embeddings) / len(books_with_embeddings)
         for i in range(1536)
     ]
 
