@@ -195,17 +195,17 @@ def test_api_flow():
     print("\n" + "=" * 70)
     print("TEST 3: End-to-End API Flow")
     print("=" * 70)
-    
+
     initial_query = "I love dystopian science fiction with strong protagonists"
     question_1 = "Books with complex world-building and political intrigue"
     question_2 = "Character-driven narratives with moral ambiguity"
     question_3 = "Prefer darker, mature themes over YA dystopian"
 
-    # Step 1: Create session
+    # Step 1: Create session (using form data, not JSON)
     print("\n1️⃣  Creating session...")
     session_response = requests.post(
         f"{BASE_URL}/api/sessions/create",
-        json={
+        data={
             "initial_query": initial_query
         },
     )
@@ -218,8 +218,13 @@ def test_api_flow():
     session_id = session_data["session_id"]
     print(f"  ✓ Session created: {session_id}")
     print(f"  ✓ Status: {session_data['status']}")
+    print(f"  ✓ Follow-up questions: {len(session_data.get('follow_up_questions', []))} questions")
 
-    # Step 2: Submit follow-up answers (hardcoded for testing)
+    # Verify status is "ready" (no CSV uploaded)
+    if session_data['status'] != 'ready':
+        print(f"  ⚠ Warning: Expected status 'ready', got '{session_data['status']}'")
+
+    # Step 2: Submit follow-up answers
     print("\n2️⃣  Submitting follow-up answers...")
     answers_response = requests.post(
         f"{BASE_URL}/api/sessions/{session_id}/answers",
@@ -237,8 +242,19 @@ def test_api_flow():
         return False
 
     answers_data = answers_response.json()
-    print(f"  ✓ Query: {initial_query} and Answers 1.{question_1}, 2. {question_2}, 3. {question_3} submitted")
+    print(f"  ✓ Answers submitted:")
+    print(f"  Query: {initial_query}")
+    print(f"    1. {question_1}")
+    print(f"    2. {question_2}")
+    print(f"    3. {question_3}")
     print(f"  ✓ Status: {answers_data['status']}")
+
+    # Display CSV books info if available
+    csv_books_count = answers_data.get('csv_books_count')
+    if csv_books_count:
+        print(f"  ✓ CSV books: {csv_books_count} books from user's reading history")
+    else:
+        print(f"  ℹ No CSV uploaded - using query-based recommendations only")
 
     # Step 3: Get recommendations
     print("\n3️⃣  Generating recommendations...")
@@ -260,10 +276,21 @@ def test_api_flow():
     # Display recommendations
     print("\n📚 Recommendations:")
     for rec in recommendations:
-        print(f"\n  [{rec['rank']}] {rec['book']['title']}")
-        print(f"      Author: {rec['book']['author']}")
+        book = rec['book']
+        print(f"\n  [{rec['rank']}] {book['title']}")
+        print(f"      Author: {book['author']}")
+        print(f"      ISBN: {book['isbn']}")
+
+        # Display rich metadata if available
+        if book.get('categories'):
+            print(f"      Categories: {', '.join(book['categories'][:3])}")
+        if book.get('publication_year'):
+            print(f"      Published: {book['publication_year']}")
+        if book.get('average_rating'):
+            print(f"      Rating: {book['average_rating']} ({book.get('ratings_count', 0)} ratings)")
+
         print(f"      Confidence: {rec['confidence_score']}")
-        print(f"      Explanation: {rec['explanation'][:100]}...")
+        print(f"      Explanation: {rec['explanation'][:150]}...")
 
     # Step 4: Submit feedback
     if recommendations:
