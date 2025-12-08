@@ -3,7 +3,7 @@
 This test suite validates:
 1. Infrastructure (Database, Redis, Langfuse)
 2. Direct LLM integration with Langfuse tracking
-3. End-to-end API flow (Session → Recommendations → Feedback)
+3. End-to-end API flow (Session → Follow-up Answers → Recommendations → Feedback)
 
 EXPECTED LANGFUSE TRACES:
 ========================
@@ -195,13 +195,18 @@ def test_api_flow():
     print("\n" + "=" * 70)
     print("TEST 3: End-to-End API Flow")
     print("=" * 70)
+    
+    initial_query = "I love dystopian science fiction with strong protagonists"
+    question_1 = "Books with complex world-building and political intrigue"
+    question_2 = "Character-driven narratives with moral ambiguity"
+    question_3 = "Prefer darker, mature themes over YA dystopian"
 
     # Step 1: Create session
     print("\n1️⃣  Creating session...")
     session_response = requests.post(
         f"{BASE_URL}/api/sessions/create",
         json={
-            "initial_query": "I love dystopian science fiction with strong protagonists"
+            "initial_query": initial_query
         },
     )
 
@@ -214,8 +219,29 @@ def test_api_flow():
     print(f"  ✓ Session created: {session_id}")
     print(f"  ✓ Status: {session_data['status']}")
 
-    # Step 2: Get recommendations
-    print("\n2️⃣  Generating recommendations...")
+    # Step 2: Submit follow-up answers (hardcoded for testing)
+    print("\n2️⃣  Submitting follow-up answers...")
+    answers_response = requests.post(
+        f"{BASE_URL}/api/sessions/{session_id}/answers",
+        json={
+            "answers": {
+                "question_1": question_1,
+                "question_2": question_2,
+                "question_3": question_3
+            }
+        },
+    )
+
+    if answers_response.status_code != 200:
+        print(f"❌ Failed to submit answers: {answers_response.text}")
+        return False
+
+    answers_data = answers_response.json()
+    print(f"  ✓ Query: {initial_query} and Answers 1.{question_1}, 2. {question_2}, 3. {question_3} submitted")
+    print(f"  ✓ Status: {answers_data['status']}")
+
+    # Step 3: Get recommendations
+    print("\n3️⃣  Generating recommendations...")
     rec_response = requests.get(f"{BASE_URL}/api/sessions/{session_id}/recommendations")
 
     if rec_response.status_code != 200:
@@ -239,10 +265,10 @@ def test_api_flow():
         print(f"      Confidence: {rec['confidence_score']}")
         print(f"      Explanation: {rec['explanation'][:100]}...")
 
-    # Step 3: Submit feedback
+    # Step 4: Submit feedback
     if recommendations:
         first_rec_id = recommendations[0]["id"]
-        print("\n3️⃣  Submitting feedback...")
+        print("\n4️⃣  Submitting feedback...")
 
         feedback_response = requests.post(
             f"{BASE_URL}/api/recommendations/{first_rec_id}/feedback",

@@ -39,7 +39,8 @@ def create_session(
     }
     session_mgr.create_session(session_id, session_data)
 
-    # For now, return empty follow-up questions (will be implemented later)
+    # Follow-up questions are handled by the frontend (hardcoded UI prompts)
+    # Backend returns empty array - frontend displays its own question set
     return SessionResponse(
         session_id=session_id,
         status="ready",
