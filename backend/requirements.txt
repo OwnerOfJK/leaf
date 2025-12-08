@@ -23,3 +23,6 @@ pydantic-settings==2.7.0
 
 # Utilities
 python-dotenv==1.0.1
+pandas==2.2.3
+scipy==1.14.1
+requests==2.32.3
