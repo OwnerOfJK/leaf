@@ -22,13 +22,30 @@ def search_similar_books(
 
     Returns:
         List of Book instances ordered by similarity (most similar first)
+        Each book has a 'similarity' attribute (0.0-1.0, higher is more similar)
     """
-    stmt = select(Book).order_by(Book.embedding.cosine_distance(embedding)).limit(limit)
+    # Select book and similarity score (1 - cosine_distance)
+    stmt = (
+        select(
+            Book,
+            (1 - Book.embedding.cosine_distance(embedding)).label('similarity')
+        )
+        .order_by(Book.embedding.cosine_distance(embedding))
+        .limit(limit)
+    )
 
     if exclude_ids:
         stmt = stmt.where(Book.id.notin_(exclude_ids))
 
-    return list(db.scalars(stmt).all())
+    results = db.execute(stmt).all()
+
+    # Attach similarity as attribute to each book
+    books = []
+    for book, similarity in results:
+        book.similarity = float(similarity)
+        books.append(book)
+
+    return books
 
 
 def search_similar_to_books(
@@ -60,7 +77,7 @@ def search_similar_to_books(
 
     # Calculate average embedding
     avg_embedding = [
-        sum(book.embedding[i] for book in books if book.embedding) / len(books)
+        sum(book.embedding[i] for book in books if book.embedding is not None) / len(books)
         for i in range(1536)
     ]
 
