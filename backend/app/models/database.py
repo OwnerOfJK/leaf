@@ -20,20 +20,45 @@ class Book(Base):
 
     Combines book metadata from Google Books API + user uploads.
     Embeddings generated using OpenAI text-embedding-3-small (1536 dimensions).
+    Enhanced with rich metadata for quality scoring and semantic search.
     """
 
     __tablename__ = "books"
 
+    # Identity
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     isbn: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    isbn13: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+
+    # Core Metadata
     title: Mapped[str] = mapped_column(Text, nullable=False)
     author: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Rich Metadata (from Google Books API)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     categories: Mapped[List[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    publisher: Mapped[str | None] = mapped_column(Text, nullable=True)
+    publication_year: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    language: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
+    # Global Ratings (from Google Books API)
+    average_rating: Mapped[float | None] = mapped_column(DECIMAL(3, 2), nullable=True)
+    ratings_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Media
     cover_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # AI/ML
     embedding: Mapped[List[float] | None] = mapped_column(Vector(1536), nullable=True)
+
+    # Metadata
+    data_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
     def __repr__(self) -> str:

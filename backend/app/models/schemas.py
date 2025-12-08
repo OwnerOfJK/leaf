@@ -75,6 +75,15 @@ class BookBase(BaseModel):
     categories: Optional[List[str]] = None
     cover_url: Optional[str] = None
 
+    # Rich metadata fields
+    isbn13: Optional[str] = None
+    page_count: Optional[int] = None
+    publisher: Optional[str] = None
+    publication_year: Optional[int] = None
+    language: Optional[str] = None
+    average_rating: Optional[Decimal] = None
+    ratings_count: Optional[int] = None
+
 
 class BookResponse(BookBase):
     """Response schema for book data."""
