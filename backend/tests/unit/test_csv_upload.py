@@ -1,42 +1,18 @@
 """CSV Upload Test Suite for Leaf Backend
-
-This test suite validates the complete CSV upload flow:
-1. CSV file upload via session creation endpoint
-2. Celery async task processing
-3. Status polling while processing
-4. Book metadata fetching from Google Books API
-5. Embedding generation and database insertion
-6. Session data update with user's books and ratings
-
-PREREQUISITES:
-==============
-1. Database migrated with rich metadata fields: alembic upgrade head
-2. Infrastructure running: docker-compose up -d postgres redis
-3. Celery worker running: celery -A app.workers.celery_app worker --loglevel=info
-4. Backend server running: uvicorn main:app --reload
-5. Google Books API key configured in .env
-6. Sample CSV file: backend/data/goodreads_library_export.csv
-
-EXPECTED BEHAVIOR:
-==================
-- CSV with 91 books should process in < 5 minutes (with API rate limits)
-- Most books should be found in Google Books API
-- Books get rich metadata (categories, ratings, page count, etc.)
-- Embeddings are generated for all books
-- User ratings (0-5) are preserved in session data
-- Session TTL is extended during processing
 """
 
 import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+import pytest
 import requests
 
 BASE_URL = "http://localhost:8000"
-CSV_PATH = Path(__file__).parent.parent / "data" / "goodreads_library_export.csv"
+# CSV file is in backend/data/ directory
+CSV_PATH = Path(__file__).parent.parent.parent / "data" / "goodreads_library_export.csv"
 
 
 # =============================================================================
@@ -50,18 +26,17 @@ def test_prerequisites():
     print("TEST 1: Prerequisites Validation")
     print("=" * 70)
 
-    checks_passed = 0
-    total_checks = 5
+    failures = []
 
     # Check 1: Backend server
     try:
         response = requests.get(f"{BASE_URL}/")
         assert response.status_code == 200
         print("✓ Backend server is running")
-        checks_passed += 1
     except Exception as e:
         print(f"❌ Backend server not responding: {e}")
         print("   Run: uvicorn main:app --reload")
+        failures.append(f"Backend server not responding: {e}")
 
     # Check 2: Database connection
     try:
@@ -70,9 +45,9 @@ def test_prerequisites():
         data = response.json()
         assert "books" in data.get("tables", [])
         print("✓ Database connected with books table")
-        checks_passed += 1
     except Exception as e:
         print(f"❌ Database check failed: {e}")
+        failures.append(f"Database check failed: {e}")
 
     # Check 3: Redis connection
     try:
@@ -81,25 +56,26 @@ def test_prerequisites():
         data = response.json()
         assert data.get("status") == "connected"
         print("✓ Redis is connected")
-        checks_passed += 1
     except Exception as e:
         print(f"❌ Redis check failed: {e}")
         print("   Run: docker-compose up -d redis")
+        failures.append(f"Redis check failed: {e}")
 
     # Check 4: CSV file exists
     if CSV_PATH.exists():
         print(f"✓ CSV file found: {CSV_PATH}")
-        checks_passed += 1
     else:
         print(f"❌ CSV file not found: {CSV_PATH}")
+        failures.append(f"CSV file not found: {CSV_PATH}")
 
     # Check 5: Celery worker (indirect check via task submission in main test)
     print("⚠ Celery worker check will be validated during CSV processing")
     print("   Make sure to run: celery -A app.workers.celery_app worker --loglevel=info")
-    checks_passed += 1  # Assume it's running for now
 
-    print(f"\n✅ Prerequisites: {checks_passed}/{total_checks} checks passed")
-    return checks_passed == total_checks
+    if failures:
+        pytest.fail(f"Prerequisites check failed:\n" + "\n".join(f"  - {f}" for f in failures))
+
+    print(f"\n✅ All prerequisites checks passed")
 
 
 # =============================================================================
@@ -126,9 +102,7 @@ def test_csv_upload_flow():
             data=data
         )
 
-    if response.status_code != 200:
-        print(f"❌ Failed to create session with CSV: {response.text}")
-        return False
+    assert response.status_code == 200, f"Failed to create session with CSV: {response.text}"
 
     session_data = response.json()
     session_id = session_data["session_id"]
@@ -137,9 +111,7 @@ def test_csv_upload_flow():
     print(f"  ✓ Session created: {session_id}")
     print(f"  ✓ Initial status: {status}")
 
-    if status != "processing_csv":
-        print(f"❌ Expected status 'processing_csv', got '{status}'")
-        return False
+    assert status == "processing_csv", f"Expected status 'processing_csv', got '{status}'"
 
     # Step 2: Poll status until processing completes
     print("\n2️⃣  Polling CSV processing status...")
@@ -156,9 +128,7 @@ def test_csv_upload_flow():
 
         status_response = requests.get(f"{BASE_URL}/api/sessions/{session_id}/status")
 
-        if status_response.status_code != 200:
-            print(f"\n❌ Status check failed: {status_response.text}")
-            return False
+        assert status_response.status_code == 200, f"Status check failed: {status_response.text}"
 
         status_data = status_response.json()
         csv_status = status_data["csv_status"]
@@ -189,12 +159,9 @@ def test_csv_upload_flow():
 
         # Check if failed
         if csv_status == "failed":
-            print(f"\n❌ CSV processing failed!")
-            return False
+            pytest.fail("CSV processing failed!")
 
-    if poll_count >= max_polls:
-        print(f"\n❌ Timeout: CSV processing took longer than {max_polls * poll_interval} seconds")
-        return False
+    assert poll_count < max_polls, f"Timeout: CSV processing took longer than {max_polls * poll_interval} seconds"
 
     # Step 3: Verify session data contains user books
     print("\n3️⃣  Verifying session data...")
@@ -203,8 +170,6 @@ def test_csv_upload_flow():
     # which should use the books_from_csv data
 
     print("  ✓ CSV processing pipeline completed successfully")
-
-    return True
 
 
 # =============================================================================
@@ -226,8 +191,6 @@ def test_data_integrity():
     print("   2. Verify rich metadata fields are populated (categories, ratings, etc.)")
     print("   3. Verify embeddings are present (vector dimension 1536)")
     print("   4. Check data_source = 'google_books'")
-
-    return True
 
 
 # =============================================================================
@@ -256,9 +219,7 @@ def test_recommendations_with_csv():
             data=data
         )
 
-    if response.status_code != 200:
-        print(f"❌ Failed to create session: {response.text}")
-        return False
+    assert response.status_code == 200, f"Failed to create session: {response.text}"
 
     session_id = response.json()["session_id"]
     print(f"  ✓ Session created: {session_id}")
@@ -279,12 +240,9 @@ def test_recommendations_with_csv():
             print("  ✓ CSV processing completed")
             break
         elif csv_status == "failed":
-            print("❌ CSV processing failed")
-            return False
+            pytest.fail("CSV processing failed")
 
-    if waited >= max_wait:
-        print("❌ Timeout waiting for CSV processing")
-        return False
+    assert waited < max_wait, "Timeout waiting for CSV processing"
 
     # Submit follow-up answers
     print("\n3️⃣  Submitting follow-up answers...")
@@ -299,9 +257,7 @@ def test_recommendations_with_csv():
         }
     )
 
-    if answers_response.status_code != 200:
-        print(f"❌ Failed to submit answers: {answers_response.text}")
-        return False
+    assert answers_response.status_code == 200, f"Failed to submit answers: {answers_response.text}"
 
     answers_data = answers_response.json()
     csv_books_count = answers_data.get("csv_books_count", 0)
@@ -312,9 +268,7 @@ def test_recommendations_with_csv():
     print("\n4️⃣  Generating recommendations...")
     rec_response = requests.get(f"{BASE_URL}/api/sessions/{session_id}/recommendations")
 
-    if rec_response.status_code != 200:
-        print(f"❌ Failed to get recommendations: {rec_response.text}")
-        return False
+    assert rec_response.status_code == 200, f"Failed to get recommendations: {rec_response.text}"
 
     rec_data = rec_response.json()
     recommendations = rec_data["recommendations"]
@@ -329,7 +283,6 @@ def test_recommendations_with_csv():
         print(f"      Why: {rec['explanation'][:150]}...")
 
     print("\n✅ Recommendations with CSV data: PASSED")
-    return True
 
 
 # =============================================================================
@@ -338,31 +291,38 @@ def test_recommendations_with_csv():
 
 
 def main():
-    """Run all CSV upload tests."""
+    """Run all CSV upload tests as a standalone script."""
     print("\n" + "📤" * 35)
     print("LEAF BACKEND - CSV UPLOAD TEST SUITE")
     print("📤" * 35)
 
     start_time = time.time()
-    results = {}
+    failed_tests = []
 
     # Run tests
-    results["prerequisites"] = test_prerequisites()
-
-    if not results["prerequisites"]:
-        print("\n❌ Prerequisites not met. Please fix issues above.")
+    try:
+        test_prerequisites()
+    except (AssertionError, Exception) as e:
+        print(f"\n❌ Prerequisites not met: {e}")
+        failed_tests.append("prerequisites")
+        print("\nPlease fix prerequisite issues before continuing.")
         sys.exit(1)
 
-    results["csv_upload"] = test_csv_upload_flow()
-    results["data_integrity"] = test_data_integrity()
+    try:
+        test_csv_upload_flow()
+    except (AssertionError, Exception) as e:
+        print(f"\n❌ CSV upload test failed: {e}")
+        failed_tests.append("csv_upload")
 
-    # Skip full recommendations test if CSV upload failed
-    if results["csv_upload"]:
-        print("\n⚠ Skipping recommendations test to save time")
-        print("   Run this test manually if you want to validate end-to-end flow")
-        results["recommendations"] = True  # Mark as passed for summary
-    else:
-        results["recommendations"] = False
+    try:
+        test_data_integrity()
+    except (AssertionError, Exception) as e:
+        print(f"\n❌ Data integrity test failed: {e}")
+        failed_tests.append("data_integrity")
+
+    # Skip full recommendations test by default to save time
+    print("\n⚠ Skipping recommendations test to save time")
+    print("   Run pytest with -k test_recommendations_with_csv to validate end-to-end flow")
 
     # Summary
     elapsed = time.time() - start_time
@@ -370,9 +330,10 @@ def main():
     print("TEST SUMMARY")
     print("=" * 70)
 
-    all_passed = all(results.values())
-    for test_name, passed in results.items():
-        status = "✅ PASSED" if passed else "❌ FAILED"
+    all_passed = len(failed_tests) == 0
+    test_names = ["prerequisites", "csv_upload", "data_integrity"]
+    for test_name in test_names:
+        status = "❌ FAILED" if test_name in failed_tests else "✅ PASSED"
         print(f"{test_name.upper():.<50} {status}")
 
     print(f"\nTotal time: {elapsed:.2f}s")
