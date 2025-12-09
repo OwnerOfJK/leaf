@@ -100,7 +100,7 @@ open htmlcov/index.html  # View report
 ```
 
 **Test Coverage:**
-- **26 unit tests**: Quality scoring, semantic filtering, dynamic weights, dislike penalties, LLM context
+- **29 unit tests**: Quality scoring, semantic filtering, dynamic weights, dislike penalties, LLM context, CSV upload
 - **Integration tests**: Infrastructure validation, Langfuse tracing, end-to-end API flow, CSV processing
 
 After running tests, check your Langfuse dashboard for traces.
@@ -150,6 +150,7 @@ curl http://localhost:8000/test/redis
 backend/
 ├── app/
 │   ├── config.py            ✓ Settings + env loading (dotenv + pydantic-settings)
+│   ├── constants.py         ✓ Centralized configuration constants
 │   ├── core/                ✓ Core infrastructure (complete)
 │   │   ├── database.py      ✓ SQLAlchemy with context managers
 │   │   ├── redis_client.py  ✓ Redis + SessionManager class
@@ -173,23 +174,26 @@ backend/
 │       ├── celery_app.py    ✓ Celery configuration
 │       └── tasks.py         ✓ CSV processing task
 ├── scripts/                 ✓ Database utilities
+│   ├── data_collection/    ✓ Production data collection (Goodreads 10k + NYT)
 │   ├── seed_books.py       ✓ Seed sample books for testing
 │   ├── clear_db.py         ✓ Clear all data (preserve schema)
 │   └── reset_db.py         ✓ Drop & recreate schema
 ├── tests/                   ✓ Test suites
-│   ├── unit/               ✓ Unit tests (26 tests)
+│   ├── unit/               ✓ Unit tests (29 tests)
 │   │   ├── test_quality_scoring.py
 │   │   ├── test_semantic_filtering.py
 │   │   ├── test_dynamic_weights.py
 │   │   ├── test_dislike_penalties.py
-│   │   └── test_llm_context.py
+│   │   ├── test_llm_context.py
+│   │   └── test_csv_upload.py
 │   ├── integration/        ✓ Integration tests
 │   │   ├── test_integration_pipeline.py
 │   │   └── test_api.py
 │   └── data/               ✓ Test data files
 ├── alembic/                 ✓ Database migrations
 │   └── versions/
-│       └── 001_initial_migration.py ✓ Applied
+│       ├── 001_initial_migration.py ✓ Initial schema (books + recommendations)
+│       └── 4b25be72aa78_add_rich_metadata_fields_to_books_table.py ✓ Rich metadata fields
 ├── main.py                  ✓ FastAPI app + test endpoints
 ├── requirements.txt         ✓ All dependencies
 ├── .env                     ✓ Environment configuration
@@ -222,7 +226,7 @@ backend/
 - [x] Google Books API integration with rate limiting and exponential backoff
 
 **Testing & Configuration:**
-- [x] **26 unit tests** covering all advanced features (quality scoring, semantic filtering, dynamic weights, dislike penalties, LLM context)
+- [x] **29 unit tests** covering all advanced features (quality scoring, semantic filtering, dynamic weights, dislike penalties, LLM context, CSV upload)
 - [x] **2 integration test suites** (core API flow + CSV upload workflow)
 - [x] **Centralized configuration** in `app/constants.py` with validation
 
@@ -237,7 +241,8 @@ tests/
 │   ├── test_semantic_filtering.py
 │   ├── test_dynamic_weights.py
 │   ├── test_dislike_penalties.py
-│   └── test_llm_context.py
+│   ├── test_llm_context.py
+│   └── test_csv_upload.py
 └── integration/                # Require services (DB, Redis, API)
     ├── test_integration_pipeline.py
     └── test_api.py
@@ -261,23 +266,48 @@ pytest --cov=app --cov-report=html
 ## Database Schema
 
 ### `books` table
-Stores book metadata with vector embeddings for similarity search.
+Stores book metadata with vector embeddings for similarity search and rich metadata for quality scoring.
 
 ```sql
+-- Identity
 - id (serial primary key)
 - isbn (varchar 20, unique, indexed)
+- isbn13 (varchar 20, nullable, indexed)
+
+-- Core Metadata
 - title (text)
 - author (text)
+
+-- Rich Metadata (from Google Books API)
 - description (text, nullable)
 - categories (text[], nullable)
+- page_count (integer, nullable)
+- publisher (text, nullable)
+- publication_year (integer, nullable, indexed)
+- language (varchar 10, nullable)
+
+-- Global Ratings (from Google Books API)
+- average_rating (decimal 3,2, nullable)
+- ratings_count (integer, nullable)
+
+-- Media
 - cover_url (text, nullable)
-- embedding (vector 1536, ivfflat indexed)
+
+-- AI/ML
+- embedding (vector 1536, nullable, ivfflat indexed)
+
+-- Metadata
+- data_source (varchar 50, nullable)
 - created_at (timestamp)
+- updated_at (timestamp)
 ```
 
 **Indexes:**
-- `idx_books_isbn` - Unique index on ISBN
-- `idx_books_embedding` - IVFFlat index for vector similarity search (cosine distance)
+- `ix_books_isbn` - Unique index on ISBN
+- `ix_books_isbn13` - Index on ISBN13
+- `ix_books_publication_year` - Index on publication year
+- `idx_books_embedding` - IVFFlat index for vector similarity search (cosine distance, lists=100)
+- `idx_books_categories` - GIN index for array search on categories
 
 ### `recommendations` table
 Stores generated recommendations with Langfuse trace linking.
@@ -289,9 +319,14 @@ Stores generated recommendations with Langfuse trace linking.
 - confidence_score (decimal 5,2)
 - explanation (text)
 - rank (integer)
-- trace_id (varchar 255) - Links to Langfuse
+- trace_id (varchar 255, nullable) - Links to Langfuse
 - created_at (timestamp, indexed)
 ```
+
+**Indexes:**
+- `ix_recommendations_session_id` - Index on session_id
+- `ix_recommendations_book_id` - Index on book_id
+- `ix_recommendations_created_at` - Index on created_at for time-based queries
 
 **Retention:** 30-day auto-cleanup (to be implemented via scheduled job)
 
@@ -305,9 +340,9 @@ The recommendation engine (`app/services/recommendation_engine.py`) implements a
 
 **2. Intelligent Retrieval** with multiple enhancement layers:
 - **Semantic Filtering**: Filters user's favorites by query relevance (prevents unrelated 5★ books from dominating)
-- **Dynamic Collaborative Weighting**: Adjusts collaborative filtering strength based on signal quality (2+ relevant books required)
+- **Dynamic Collaborative Weighting**: Adjusts collaborative filtering strength based on signal quality (requires minimum relevant books per `MIN_RELEVANT_BOOKS`)
 - **Quality Scoring**: Re-ranks candidates based on metadata richness (description, categories, ratings)
-- **Dislike Penalties**: Penalizes books similar to user's 1-2★ ratings (requires 2+ dislikes, 60% similarity threshold)
+- **Dislike Penalties**: Penalizes books similar to user's low-rated books (threshold defined by `DISLIKE_THRESHOLD`, similarity threshold per `DISLIKE_SIMILARITY_THRESHOLD`)
 
 **3. LLM Generation** - GPT-4o-mini selects top 3 books with personalized explanations that reference user's reading history
 
@@ -315,44 +350,33 @@ The recommendation engine (`app/services/recommendation_engine.py`) implements a
 
 ### Key Enhancements
 
-**Quality Scoring**: Books are scored 0.0-1.0 based on metadata completeness:
-- Description (50%): Long = 0.5, Short = 0.2
-- Categories (20%): Multiple = 0.2, Single = 0.1
-- Ratings (20%): 100+ = 0.2, 10+ = 0.1
-- Other (10%): page_count + publisher
+**Quality Scoring**: Books are scored based on metadata completeness using weights defined in `QUALITY_SCORE_WEIGHTS`:
+- Description quality (long vs short)
+- Categories count (multiple vs single)
+- Ratings credibility (high vs medium rating counts)
+- Other metadata (page_count, publisher)
 
-**Semantic Filtering**: Only uses user's favorites that are semantically relevant to current query (40% similarity threshold)
+**Semantic Filtering**: Only uses user's favorites that are semantically relevant to current query (threshold per `SIMILARITY_THRESHOLD`)
 
-**Dynamic Weighting**: Collaborative filtering weight scales from 0.0 (no CSV) to 0.5 (5+ relevant favorites)
+**Dynamic Weighting**: Collaborative filtering weight scales dynamically based on number of relevant favorites
 
-**Dislike Penalties**: Books >60% similar to user's dislikes have similarity halved
+**Dislike Penalties**: Books similar to user's dislikes (per `DISLIKE_THRESHOLD`) have similarity reduced by penalty factor (per `DISLIKE_PENALTY` when above `DISLIKE_SIMILARITY_THRESHOLD`)
 
 ### Configuration Parameters
 
 All tunable parameters are centralized in `app/constants.py`:
 
-```python
-# Semantic Filtering
-SIMILARITY_THRESHOLD = 0.4       # Min similarity for relevance filtering
-MIN_RELEVANT_BOOKS = 2           # Min relevant books for collaborative filtering
+**Key Configuration Categories:**
+- **LLM Configuration**: Model selection for generation
+- **Quality Scoring Weights**: Weights for metadata quality assessment (description, categories, ratings, etc.)
+- **Semantic Filtering**: Thresholds for query relevance filtering
+- **Rating Thresholds**: Definitions for "favorites" and "dislikes"
+- **Dislike Penalties**: Similarity penalty multipliers and thresholds
+- **Retrieval**: Candidate selection limits
+- **LLM Context**: Context size limits for generation
+- **CSV Processing**: Upload size limits and processing intervals
 
-# Rating Thresholds
-HIGH_RATING_THRESHOLD = 4        # Defines "favorites" (4-5 stars)
-DISLIKE_THRESHOLD = 2            # Defines "dislikes" (1-2 stars)
-
-# Dislike Penalties
-DISLIKE_PENALTY = 0.5            # Multiplier (halves similarity)
-DISLIKE_SIMILARITY_THRESHOLD = 0.6  # Only penalize if >60% similar
-
-# Retrieval
-DEFAULT_TOP_K = 20               # Candidates before LLM selection
-COLLABORATIVE_FILTERING_LIMIT = 10  # Max collaborative results
-```
-
-**Tuning Examples:**
-- Stricter filtering: `SIMILARITY_THRESHOLD = 0.5` (only very relevant books)
-- Harsher penalties: `DISLIKE_PENALTY = 0.2` (near-elimination of similar books)
-- More collaborative: `MIN_RELEVANT_BOOKS = 1` (use collaborative with fewer books)
+See `app/constants.py` for current values and inline documentation on each parameter's purpose and tuning guidance.
 
 ### Langfuse Tracing
 
@@ -382,8 +406,8 @@ When a user submits a query, the system:
 - Creates an embedding for the query using OpenAI text-embedding-3-small
 - Performs two parallel vector searches using pgvector cosine similarity:
   - **Query-based search**: Finds books semantically similar to the query
-  - **Collaborative search** (if CSV uploaded): Finds books similar to user's reading history
-- Retrieves 20 initial candidate books
+  - **Collaborative search** (if CSV uploaded): Finds books similar to user's reading history (limited by `COLLABORATIVE_FILTERING_LIMIT`)
+- Retrieves initial candidate books (total per `DEFAULT_TOP_K`)
 
 **Example**: User queries "fantasy with magic systems"
 - Query embedding captures semantic meaning of "fantasy" + "magic systems"
@@ -391,58 +415,58 @@ When a user submits a query, the system:
 
 ### 2. Semantic Filtering (Query-Relevant Favorites)
 
-**Problem**: If a user has 20 coding books rated 5★ but queries for fantasy, we don't want coding books to dominate recommendations.
+**Problem**: If a user has many coding books rated highly but queries for fantasy, we don't want coding books to dominate recommendations.
 
 **Solution**: Filter user's favorites by semantic relevance to current query
-- Calculate cosine similarity between query embedding and each of user's high-rated books (4-5★)
-- Only use favorites with ≥40% similarity to query (`SIMILARITY_THRESHOLD = 0.4`)
-- Require minimum 2 relevant books to activate collaborative filtering (`MIN_RELEVANT_BOOKS = 2`)
+- Calculate cosine similarity between query embedding and each of user's high-rated books (per `HIGH_RATING_THRESHOLD`)
+- Only use favorites above similarity threshold (per `SIMILARITY_THRESHOLD`)
+- Require minimum relevant books to activate collaborative filtering (per `MIN_RELEVANT_BOOKS`)
 
 **Example**:
-- User has 20 coding books (5★) + 3 fantasy books (5★)
+- User has many coding books (highly rated) + some fantasy books (highly rated)
 - Query: "fantasy with magic systems"
-- Only the 3 fantasy books pass semantic filter (coding books filtered out)
+- Only the fantasy books pass semantic filter (coding books filtered out)
 - Result: Collaborative search uses only relevant fantasy favorites
 
 ### 3. Quality Scoring (Metadata-Based Re-ranking)
 
 **Problem**: Some books have rich metadata (long descriptions, multiple categories, many ratings) while others are sparse.
 
-**Solution**: Score each candidate 0.0-1.0 based on metadata quality
-- **Description** (50%): Long (>100 chars) = 0.5, Short = 0.2
-- **Categories** (20%): Multiple = 0.2, Single = 0.1
-- **Ratings** (20%): 100+ ratings = 0.2, 10+ ratings = 0.1
-- **Other** (10%): page_count + publisher = 0.05 each
+**Solution**: Score each candidate based on metadata quality using weights defined in `QUALITY_SCORE_WEIGHTS`:
+- **Description**: Long descriptions score higher than short ones
+- **Categories**: Multiple categories score higher than single
+- **Ratings**: High rating counts score higher than low counts
+- **Other**: Presence of page_count, publisher, etc.
 
 **Adjustment**: Multiply similarity score by quality score
-- Book A: similarity=0.85, quality=0.3 → adjusted=0.255 (sparse metadata)
-- Book B: similarity=0.70, quality=1.0 → adjusted=0.70 (rich metadata)
+- Book A: High similarity but sparse metadata → Lower adjusted score
+- Book B: Lower similarity but rich metadata → Higher adjusted score
 - Result: Book B ranks higher despite lower raw similarity
 
 ### 4. Dislike Penalties (Avoid Similar Books)
 
-**Problem**: User rated "Twilight" 1★ but system might recommend similar books in the same series.
+**Problem**: User rated a book poorly but system might recommend similar books in the same series.
 
-**Solution**: Penalize candidates similar to user's dislikes (1-2★ ratings)
-- Requires minimum 2 dislikes to activate (filters outliers)
+**Solution**: Penalize candidates similar to user's dislikes (ratings at or below `DISLIKE_THRESHOLD`)
+- Requires minimum number of dislikes to activate (filters outliers)
 - Calculate similarity between each candidate and each disliked book
-- If similarity ≥60% (`DISLIKE_SIMILARITY_THRESHOLD = 0.6`), apply penalty
-- Penalty: Multiply similarity by 0.5 (`DISLIKE_PENALTY = 0.5`)
+- If similarity above threshold (per `DISLIKE_SIMILARITY_THRESHOLD`), apply penalty
+- Penalty: Multiply similarity by penalty factor (per `DISLIKE_PENALTY`)
 
 **Example**:
-- User rated "Twilight" 1★
-- Candidate "Midnight Sun" has 70% similarity to Twilight
-- Original similarity: 0.90 → Penalized: 0.90 × 0.5 = 0.45
+- User rated a book poorly
+- Candidate has high similarity to that disliked book
+- Original similarity → Penalized: similarity × penalty factor
 - Result: Book ranks much lower but isn't eliminated (LLM has final say)
 
 ### 5. LLM Generation (Intelligent Selection)
 
-After refinement, the top 20 candidates are sent to GPT-4o-mini with:
+After refinement, the top candidates (per `DEFAULT_TOP_K`) are sent to the LLM (per `LLM_MODEL`) with:
 - **User context**:
-  - Books they loved (4-5★) with titles/authors
-  - Books they disliked (1-2★) with warning to avoid similar themes
-  - Rating distribution (5★: X, 4★: Y, etc.)
-- **Candidate metadata**: title, author, description, categories, ratings, publication year
+  - Books they loved (high ratings per `HIGH_RATING_THRESHOLD`) with titles/authors (limited by `MAX_FAVORITES_IN_CONTEXT`)
+  - Books they disliked (low ratings per `DISLIKE_THRESHOLD`) with warning to avoid similar themes (limited by `MAX_DISLIKES_IN_CONTEXT`)
+  - Rating distribution across all rating levels
+- **Candidate metadata**: title, author, description (truncated per `CANDIDATE_DESCRIPTION_MAX_LENGTH`), categories, ratings, publication year
 - **Instruction**: Select top 3 books with confidence scores and personalized explanations
 
 **LLM's job**: Make final intelligent decision considering:
@@ -467,14 +491,15 @@ The system intelligently adjusts how much to weight collaborative filtering vs. 
 
 | Scenario | Collaborative Weight | Behavior |
 |----------|---------------------|----------|
-| No CSV uploaded | 0.0 (0%) | Pure semantic search on query |
-| CSV with no favorites | 0.1-0.2 (10-20%) | Weak signal from all books |
-| CSV with favorites but none relevant to query | 0.15-0.3 (15-30%) | Moderate signal from all favorites |
-| CSV with 2+ relevant favorites | 0.2-0.5 (20-50%) | Strong signal from relevant favorites |
+| No CSV uploaded | Low (approaching 0%) | Pure semantic search on query |
+| CSV with no favorites | Low | Weak signal from all books |
+| CSV with favorites but none relevant to query | Low-Medium | Moderate signal from all favorites |
+| CSV with relevant favorites (≥ `MIN_RELEVANT_BOOKS`) | Medium-High | Strong signal from relevant favorites |
 
-**Example**: If user has 5 relevant favorites, weight = 0.5
-- 10 books from collaborative search (50%)
-- 10 books from query search (50%)
+**Example**: If user has multiple relevant favorites, collaborative weight increases
+- More books from collaborative search (higher weight)
+- Fewer books from query search (lower weight)
+- Total candidates retrieved per `DEFAULT_TOP_K` and `COLLABORATIVE_FILTERING_LIMIT`
 
 This prevents:
 - Over-reliance on collaborative when signal is weak
@@ -496,7 +521,7 @@ The backend supports async CSV upload for Goodreads library exports (`app/worker
 
 ### 1. Upload & Validation
 - User uploads CSV via `POST /api/sessions/create` (multipart/form-data)
-- Validates file extension and size (max 10MB)
+- Validates file extension and size (max per `CSV_UPLOAD_MAX_SIZE_MB`)
 - Saves to temporary location (`/tmp/leaf_csv_uploads/{session_id}.csv`)
 - Sets CSV status to "pending" in Redis
 
@@ -513,9 +538,9 @@ The backend supports async CSV upload for Goodreads library exports (`app/worker
 - If not found:
   - Fetches metadata from Google Books API
   - Exponential backoff for rate limiting (429 errors)
-  - Generates embedding for title + author + description
+  - Generates embedding for title + author + description (truncated per `MAX_DESCRIPTION_LENGTH`)
   - Inserts into PostgreSQL with rich metadata
-- Updates progress in Redis every 10 books
+- Updates progress in Redis periodically (interval per `CSV_PROGRESS_UPDATE_INTERVAL`)
 - Extends session TTL to prevent expiration during processing
 
 ### 4. Session Update
@@ -525,11 +550,11 @@ The backend supports async CSV upload for Goodreads library exports (`app/worker
 - Deletes temporary CSV file
 
 ### 5. Frontend Polling
-- Frontend polls `GET /api/sessions/{id}/status` every 5 seconds
+- Frontend polls `GET /api/sessions/{id}/status` periodically
 - Receives progress: `{books_total, books_processed, new_books_added}`
 - Proceeds to questions page when status is "completed"
 
-**Processing time:** ~3-5 minutes for 100 books (depends on Google Books API rate limits)
+**Processing time:** Depends on number of books and Google Books API rate limits
 
 ## Core Infrastructure Details
 
@@ -595,9 +620,14 @@ docker-compose logs -f postgres             # View logs
 docker-compose ps                           # Check status
 
 # Database utilities
-python scripts/seed_books.py               # Add 10 sample books
+python scripts/seed_books.py               # Add 10 sample books for testing
 python scripts/clear_db.py                 # Clear all data (keep schema)
 python scripts/reset_db.py                 # Drop & recreate schema (DESTRUCTIVE)
+
+# Data collection (production database seeding)
+python scripts/data_collection/seed_goodreads_10k.py              # Load Goodreads 10k dataset
+python scripts/data_collection/collect_nyt_bestsellers.py         # Collect NYT bestsellers (2008-2025)
+python scripts/data_collection/collect_nyt_bestsellers.py --resume # Resume from checkpoint
 
 # Testing
 pytest                                     # Run all tests
@@ -746,5 +776,5 @@ Overall:                      ████████████████�
 - ✓ Advanced RAG pipeline (quality scoring, semantic filtering, dynamic weights, dislike penalties)
 - ✓ Full Langfuse observability with hierarchical tracing
 - ✓ Async CSV processing with Google Books API integration
-- ✓ Comprehensive test coverage (26 unit tests + 2 integration test suites)
+- ✓ Comprehensive test coverage (29 unit tests + 2 integration test suites)
 - ✓ Production-ready configuration and documentation
