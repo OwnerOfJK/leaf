@@ -13,8 +13,8 @@ settings = get_settings()
 
 # Google Books API constants
 GOOGLE_BOOKS_BASE_URL = "https://www.googleapis.com/books/v1/volumes"
-MAX_RETRIES = 3
-RETRY_DELAY = 1  # seconds
+MAX_RETRIES = 10
+RETRY_BACKOFF = [1, 2, 5, 10, 20, 30, 60, 90, 120, 180]  # seconds for each retry
 
 
 def fetch_from_google_books(isbn: str) -> dict[str, Any] | None:
@@ -55,13 +55,20 @@ def fetch_from_google_books(isbn: str) -> dict[str, Any] | None:
             # Handle rate limiting
             if response.status_code == 429:
                 if attempt < MAX_RETRIES - 1:
-                    wait_time = RETRY_DELAY * (2 ** attempt)  # Exponential backoff
-                    logger.warning(f"Rate limited by Google Books API. Retrying in {wait_time}s...")
+                    wait_time = RETRY_BACKOFF[attempt]
+                    logger.warning(
+                        f"Rate limited by Google Books API (attempt {attempt + 1}/{MAX_RETRIES}). "
+                        f"Retrying in {wait_time}s..."
+                    )
                     time.sleep(wait_time)
                     continue
                 else:
-                    logger.error(f"Rate limit exceeded for ISBN {isbn} after {MAX_RETRIES} attempts")
-                    return None
+                    logger.error(
+                        f"QUOTA EXCEEDED: Rate limit for ISBN {isbn} after {MAX_RETRIES} attempts. "
+                        f"Google Books quota likely exhausted."
+                    )
+                    # Return a special marker to indicate quota exhaustion (not just book not found)
+                    return "QUOTA_EXCEEDED"
 
             # Handle other HTTP errors
             if response.status_code != 200:
@@ -123,7 +130,9 @@ def fetch_from_google_books(isbn: str) -> dict[str, Any] | None:
         except requests.RequestException as e:
             logger.error(f"Network error fetching ISBN {isbn}: {e}")
             if attempt < MAX_RETRIES - 1:
-                time.sleep(RETRY_DELAY)
+                wait_time = RETRY_BACKOFF[attempt]
+                logger.info(f"Retrying after network error in {wait_time}s...")
+                time.sleep(wait_time)
                 continue
             return None
         except (KeyError, ValueError) as e:
