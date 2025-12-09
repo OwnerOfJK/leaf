@@ -7,7 +7,7 @@ from sqlalchemy import or_
 
 from app.constants import CSV_PROGRESS_UPDATE_INTERVAL, MAX_DESCRIPTION_LENGTH
 from app.core.database import SessionLocal
-from app.core.embeddings import create_embedding, format_book_text
+from app.core.embeddings import create_embeddings_batch, format_book_text
 from app.core.redis_client import session_manager
 from app.models.database import Book
 from app.services.google_books_api import fetch_from_google_books
@@ -66,7 +66,9 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
         books_failed = 0
         user_books = []  # List of {book_id, title, author, user_rating}
 
-        # Process each book
+        # Pass 1: Collect existing books and new books needing embeddings
+        new_books_to_add = []  # List of {google_data, embedding_text, user_rating}
+
         for idx, book_data in enumerate(books_from_csv, 1):
             try:
                 # Extend session TTL periodically to keep it alive during processing
@@ -128,46 +130,22 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                     description = description[:MAX_DESCRIPTION_LENGTH]
                     google_data["description"] = description
 
-                # Generate embedding for the book
+                # Prepare embedding text
                 embedding_text = format_book_text(
                     title=google_data["title"],
                     author=google_data["author"],
                     description=description
                 )
-                embedding = create_embedding(embedding_text)
 
-                # Create new book record
-                new_book = Book(
-                    isbn=google_data["isbn"],
-                    isbn13=google_data["isbn13"],
-                    title=google_data["title"],
-                    author=google_data["author"],
-                    description=description,
-                    categories=google_data.get("categories"),
-                    page_count=google_data.get("page_count"),
-                    publisher=google_data.get("publisher"),
-                    publication_year=google_data.get("publication_year"),
-                    language=google_data.get("language"),
-                    average_rating=google_data.get("average_rating"),
-                    ratings_count=google_data.get("ratings_count"),
-                    cover_url=google_data.get("cover_url"),
-                    embedding=embedding,
-                    data_source="google_books"
-                )
-
-                db.add(new_book)
-                db.flush()  # Get the book ID without committing
-                books_added += 1
-
-                user_books.append({
-                    "book_id": new_book.id,
-                    "title": new_book.title,
-                    "author": new_book.author,
+                # Collect for batch processing
+                new_books_to_add.append({
+                    "google_data": google_data,
+                    "embedding_text": embedding_text,
                     "user_rating": book_data["user_rating"]
                 })
 
-                logger.info(
-                    f"Added new book: {new_book.title} (ID: {new_book.id}) "
+                logger.debug(
+                    f"Collected book for batch embedding: {google_data['title']} "
                     f"[{idx}/{total_books}]"
                 )
 
@@ -179,6 +157,63 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                 )
                 # Continue processing remaining books
                 continue
+
+        # Pass 2: Batch generate embeddings for all new books
+        if new_books_to_add:
+            logger.info(f"Generating embeddings for {len(new_books_to_add)} new books in batch")
+
+            try:
+                # Extract all embedding texts
+                embedding_texts = [book["embedding_text"] for book in new_books_to_add]
+
+                # Generate all embeddings in a single batch call (or multiple if > 2048)
+                all_embeddings = []
+                batch_size = 2048
+                for i in range(0, len(embedding_texts), batch_size):
+                    batch = embedding_texts[i:i + batch_size]
+                    batch_embeddings = create_embeddings_batch(batch)
+                    all_embeddings.extend(batch_embeddings)
+                    logger.debug(f"Generated {len(batch_embeddings)} embeddings (batch {i//batch_size + 1})")
+
+                # Pass 3: Insert all books with embeddings into database
+                for book_info, embedding in zip(new_books_to_add, all_embeddings):
+                    google_data = book_info["google_data"]
+
+                    new_book = Book(
+                        isbn=google_data["isbn"],
+                        isbn13=google_data["isbn13"],
+                        title=google_data["title"],
+                        author=google_data["author"],
+                        description=google_data.get("description"),
+                        categories=google_data.get("categories"),
+                        page_count=google_data.get("page_count"),
+                        publisher=google_data.get("publisher"),
+                        publication_year=google_data.get("publication_year"),
+                        language=google_data.get("language"),
+                        average_rating=google_data.get("average_rating"),
+                        ratings_count=google_data.get("ratings_count"),
+                        cover_url=google_data.get("cover_url"),
+                        embedding=embedding,
+                        data_source="google_books"
+                    )
+
+                    db.add(new_book)
+                    db.flush()  # Get the book ID without committing
+                    books_added += 1
+
+                    user_books.append({
+                        "book_id": new_book.id,
+                        "title": new_book.title,
+                        "author": new_book.author,
+                        "user_rating": book_info["user_rating"]
+                    })
+
+                    logger.info(f"Added new book: {new_book.title} (ID: {new_book.id})")
+
+            except Exception as e:
+                logger.error(f"Error during batch embedding generation: {e}", exc_info=True)
+                books_failed += len(new_books_to_add)
+                # Continue with existing books only
 
         # Commit all changes
         db.commit()
