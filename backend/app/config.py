@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # Google Books API
     google_books_api_key: str
 
+    # NYT Books API
+    nyt_books_api_key: str
+
     # Celery
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
