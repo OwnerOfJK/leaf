@@ -1,28 +1,3 @@
-"""
-Centralized Configuration Constants for Recommendation Engine
-
-This file contains all tunable parameters for the book recommendation system.
-The engine uses a multi-stage RAG pipeline with the following components:
-
-PIPELINE STAGES:
-1. RETRIEVAL STAGE:
-   - Quality Scoring: Re-rank candidates by metadata richness
-   - Dynamic Collaborative Filtering: Use user's relevant favorites
-   - Semantic Filtering: Filter user books by query relevance
-
-2. PENALTY STAGE:
-   - Dislike Penalties: Downrank books similar to dislikes
-
-3. GENERATION STAGE:
-   - LLM Selection: GPT-4o-mini selects top 3 with explanations
-   - Enhanced Context: Uses user's reading history and preferences
-
-TUNING GUIDE:
-- Increase SIMILARITY_THRESHOLD (0.4 → 0.5) for stricter filtering
-- Decrease DISLIKE_PENALTY (0.5 → 0.3) for gentler penalties
-- Adjust QUALITY_SCORE_WEIGHTS to prioritize different metadata
-"""
-
 # =============================================================================
 # LLM CONFIGURATION
 # =============================================================================

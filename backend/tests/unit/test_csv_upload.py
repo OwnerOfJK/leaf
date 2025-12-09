@@ -12,7 +12,7 @@ import requests
 
 BASE_URL = "http://localhost:8000"
 # CSV file is in backend/data/ directory
-CSV_PATH = Path(__file__).parent.parent.parent / "data" / "goodreads_library_export.csv"
+CSV_PATH = Path(__file__).parent.parent.parent / "data" / "goodreads_library_test.csv"
 
 
 # =============================================================================
