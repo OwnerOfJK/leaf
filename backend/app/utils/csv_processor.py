@@ -143,6 +143,112 @@ def parse_goodreads_csv(file_path: Path) -> list[dict[str, Any]]:
         raise
 
 
+def parse_goodbooks_10k_csv(file_path: Path) -> list[dict[str, Any]]:
+    """Parse goodbooks-10k dataset CSV file.
+
+    This is a different format than personal Goodreads library exports.
+    Source: https://github.com/zygmuntz/goodbooks-10k
+
+    Args:
+        file_path: Path to the books.csv file
+
+    Returns:
+        List of book dictionaries with structure:
+        [
+            {
+                'isbn': str | None,
+                'isbn13': str | None,
+                'title': str,
+                'author': str
+            },
+            ...
+        ]
+
+    Raises:
+        FileNotFoundError: If CSV file doesn't exist
+        ValueError: If CSV is malformed or missing required columns
+    """
+    if not file_path.exists():
+        raise FileNotFoundError(f"CSV file not found: {file_path}")
+
+    try:
+        # Read CSV with pandas
+        df = pd.read_csv(file_path)
+
+        # Validate required columns exist (goodbooks-10k format uses lowercase)
+        required_columns = ["isbn", "isbn13", "title", "authors"]
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"CSV missing required columns: {missing_columns}")
+
+        books = []
+        skipped_count = 0
+
+        for idx, row in df.iterrows():
+            # Clean ISBN (can be numeric or contain 'X' for ISBN-10)
+            isbn_raw = row["isbn"]
+            isbn = None
+            if pd.notna(isbn_raw):
+                isbn_str = str(isbn_raw).strip().upper()
+
+                # Check if it contains non-numeric characters (valid for ISBN-10 with X)
+                if 'X' in isbn_str or not isbn_str.replace('.', '').replace('e', '').replace('+', '').replace('-', '').isdigit():
+                    # It's likely a string ISBN (possibly with X)
+                    # Remove any whitespace, hyphens
+                    isbn_str = re.sub(r"[\s\-]", "", isbn_str)
+                    if isbn_str and isbn_str != "0":
+                        isbn = isbn_str
+                else:
+                    # It's numeric, convert from float/int format
+                    try:
+                        isbn_str = str(int(float(isbn_raw))).strip()
+                        if isbn_str and isbn_str != "0":
+                            isbn = isbn_str
+                    except (ValueError, OverflowError):
+                        logger.warning(f"Failed to parse ISBN for '{row['title']}': {isbn_raw}")
+
+            # Clean ISBN13 (stored in scientific notation like 9.78043902348e+12)
+            isbn13_raw = row["isbn13"]
+            isbn13 = None
+            if pd.notna(isbn13_raw):
+                try:
+                    # Convert scientific notation to integer, then to string
+                    isbn13_int = int(float(isbn13_raw))
+                    isbn13 = str(isbn13_int)
+                except (ValueError, OverflowError):
+                    logger.warning(f"Failed to parse ISBN13 for '{row['title']}': {isbn13_raw}")
+
+            # Skip books with no valid ISBN at all
+            if not isbn and not isbn13:
+                skipped_count += 1
+                logger.debug(f"Skipping row {idx}: No valid ISBN found for '{row['title']}'")
+                continue
+
+            # Extract title and author
+            title = str(row["title"]).strip() if pd.notna(row["title"]) else "Unknown Title"
+            author = str(row["authors"]).strip() if pd.notna(row["authors"]) else "Unknown Author"
+
+            books.append({
+                "isbn": isbn,
+                "isbn13": isbn13,
+                "title": title,
+                "author": author
+            })
+
+        logger.info(
+            f"Parsed {len(books)} books from goodbooks-10k CSV (skipped {skipped_count} books without ISBNs)"
+        )
+        return books
+
+    except pd.errors.EmptyDataError:
+        raise ValueError("CSV file is empty")
+    except pd.errors.ParserError as e:
+        raise ValueError(f"Failed to parse CSV: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error parsing goodbooks-10k CSV: {e}")
+        raise
+
+
 def validate_csv_file(file_path: Path, max_size_mb: int = CSV_UPLOAD_MAX_SIZE_MB) -> None:
     """Validate CSV file before processing.
 
