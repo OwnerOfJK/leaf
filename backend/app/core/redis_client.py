@@ -111,6 +111,47 @@ class SessionManager:
         data = self.client.get(key)
         return json.loads(data) if data else None
 
+    def store_generated_question(
+        self, session_id: str, question_number: int, question: str
+    ) -> None:
+        """Store a generated question in the session.
+
+        Updates the session data to include the generated question.
+
+        Args:
+            session_id: Unique session identifier
+            question_number: Question number (1, 2, or 3)
+            question: Generated question text
+        """
+        session_data = self.get_session(session_id)
+        if not session_data:
+            raise ValueError(f"Session {session_id} not found")
+
+        # Initialize generated_questions dict if not present
+        if "generated_questions" not in session_data:
+            session_data["generated_questions"] = {}
+
+        # Store the question
+        session_data["generated_questions"][question_number] = question
+
+        # Update session with extended TTL
+        self.update_session(session_id, session_data)
+
+    def get_generated_questions(self, session_id: str) -> dict[int, str]:
+        """Get all generated questions for a session.
+
+        Args:
+            session_id: Unique session identifier
+
+        Returns:
+            Dict mapping question number to question text
+        """
+        session_data = self.get_session(session_id)
+        if not session_data:
+            return {}
+
+        return session_data.get("generated_questions", {})
+
 
 # Global session manager instance
 session_manager = SessionManager(redis_client)

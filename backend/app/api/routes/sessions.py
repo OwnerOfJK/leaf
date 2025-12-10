@@ -8,7 +8,15 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.core.redis_client import SessionManager, get_session_manager
-from app.models.schemas import SessionAnswersResponse, SessionAnswersSubmit, SessionResponse, SessionStatusResponse
+from app.models.schemas import (
+    GenerateQuestionRequest,
+    GenerateQuestionResponse,
+    SessionAnswersResponse,
+    SessionAnswersSubmit,
+    SessionResponse,
+    SessionStatusResponse,
+)
+from app.services.question_generator import FALLBACK_QUESTIONS, generate_question
 from app.workers.tasks import process_csv_upload
 
 logger = logging.getLogger(__name__)
@@ -184,3 +192,85 @@ def get_session_status(
         response.new_books_added = metadata.get("added")
 
     return response
+
+
+@router.post("/{session_id}/generate-question", response_model=GenerateQuestionResponse)
+def generate_follow_up_question(
+    session_id: str,
+    request: GenerateQuestionRequest,
+    session_mgr: SessionManager = Depends(get_session_manager),
+) -> GenerateQuestionResponse:
+    """Generate a contextually relevant follow-up question using LLM.
+
+    Uses context including:
+    - User's initial query
+    - All previous questions and answers
+
+    Falls back to predefined questions if LLM generation fails.
+
+    Args:
+        session_id: Session identifier
+        request: Question generation request with question_number
+        session_mgr: Redis session manager
+
+    Returns:
+        Generated question with question number
+    """
+    # Get session data
+    session_data = session_mgr.get_session(session_id)
+    if not session_data:
+        raise HTTPException(status_code=404, detail="Session not found or expired")
+
+    question_number = request.question_number
+
+    # Check if this question was already generated (return cached version)
+    generated_questions = session_mgr.get_generated_questions(session_id)
+    if question_number in generated_questions:
+        logger.info(f"Returning cached question {question_number} for session {session_id}")
+        return GenerateQuestionResponse(
+            question=generated_questions[question_number],
+            question_number=question_number,
+        )
+
+    try:
+        # Get previous Q&As for context
+        previous_questions = {
+            int(k): v for k, v in generated_questions.items()
+        }
+        previous_answers = session_data.get("follow_up_answers", {})
+
+        # Generate question using LLM (without CSV data for faster generation)
+        # CSV will be processed in background and ready for recommendations
+        generated_question = generate_question(
+            question_number=question_number,
+            initial_query=session_data["initial_query"],
+            previous_questions=previous_questions,
+            previous_answers=previous_answers,
+        )
+
+        # Store generated question in Redis
+        session_mgr.store_generated_question(session_id, question_number, generated_question)
+
+        logger.info(f"Successfully generated question {question_number} for session {session_id}")
+
+        return GenerateQuestionResponse(
+            question=generated_question,
+            question_number=question_number,
+        )
+
+    except Exception as e:
+        # Fallback to predefined questions on error
+        logger.warning(
+            f"Failed to generate question {question_number} for session {session_id}, "
+            f"using fallback: {e}"
+        )
+
+        fallback_question = FALLBACK_QUESTIONS[question_number]
+
+        # Store fallback question in Redis
+        session_mgr.store_generated_question(session_id, question_number, fallback_question)
+
+        return GenerateQuestionResponse(
+            question=fallback_question,
+            question_number=question_number,
+        )

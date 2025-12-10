@@ -40,11 +40,12 @@ def generate_recommendations(
     query: str,
     user_books: list[dict] | None = None,
     follow_up_answers: dict | None = None,
+    generated_questions: dict | None = None,
 ) -> tuple[list[Recommendation], str]:
     """Generate personalized book recommendations using RAG pipeline.
 
     Pipeline steps:
-    1. Query understanding: Combine query + follow-up answers
+    1. Query understanding: Combine query + follow-up Q&As
     2. Retrieval: Vector search using user books + general search
     3. Generation: LLM ranks and selects top 3 with explanations
     4. Storage: Save to PostgreSQL with trace_id
@@ -55,12 +56,13 @@ def generate_recommendations(
         query: User's initial query
         user_books: Optional list of {book_id, title, author, user_rating} from CSV
         follow_up_answers: Optional dictionary of follow-up answers
+        generated_questions: Optional dictionary of generated questions
 
     Returns:
         Tuple of (list of Recommendation objects, trace_id)
     """
     # Step 1: Build enhanced query
-    enhanced_query = _build_enhanced_query(query, follow_up_answers)
+    enhanced_query = _build_enhanced_query(query, follow_up_answers, generated_questions)
 
     # Step 2: Retrieve candidate books
     candidate_books = _retrieve_candidates(
@@ -95,26 +97,46 @@ def generate_recommendations(
 
 
 @observe()
-def _build_enhanced_query(query: str, follow_up_answers: dict | None = None) -> str:
-    """Combine initial query with follow-up answers.
+def _build_enhanced_query(
+    query: str,
+    follow_up_answers: dict | None = None,
+    generated_questions: dict | None = None,
+) -> str:
+    """Combine initial query with follow-up questions and answers.
+
+    Creates a rich context by including both the questions asked and the user's
+    answers, preserving the conversational flow.
 
     Args:
         query: User's initial query
-        follow_up_answers: Optional follow-up answers
+        follow_up_answers: Optional follow-up answers {question_1: answer, ...}
+        generated_questions: Optional generated questions {1: question, 2: question, ...}
 
     Returns:
-        Enhanced query string
+        Enhanced query string with Q&A pairs
     """
-    if not follow_up_answers:
-        return query
+    parts = [f"Initial request: {query}"]
 
-    # Combine query with answers
-    parts = [query]
-    for key, value in follow_up_answers.items():
-        if value:
-            parts.append(f"{key}: {value}")
+    # If we have questions and answers, format as Q&A pairs
+    if follow_up_answers and generated_questions:
+        # Iterate through questions in order (1, 2, 3)
+        for q_num in sorted(generated_questions.keys()):
+            question = generated_questions[q_num]
+            answer_key = f"question_{q_num}"
+            answer = follow_up_answers.get(answer_key)
 
-    return " ".join(parts)
+            if answer:
+                parts.append(f"Q: {question}")
+                parts.append(f"A: {answer}")
+            # Skip pairs where user didn't answer
+
+    elif follow_up_answers:
+        # Fallback: if we don't have questions, just include answers
+        for key, value in follow_up_answers.items():
+            if value:
+                parts.append(f"{key}: {value}")
+
+    return "\n".join(parts)
 
 
 @observe()

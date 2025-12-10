@@ -60,6 +60,19 @@ class SessionStatusResponse(BaseModel):
     new_books_added: Optional[int] = None
 
 
+class GenerateQuestionRequest(BaseModel):
+    """Request schema for generating a follow-up question."""
+
+    question_number: int = Field(..., ge=1, le=3, description="Question number (1, 2, or 3)")
+
+
+class GenerateQuestionResponse(BaseModel):
+    """Response schema for generated question."""
+
+    question: str = Field(..., description="Generated question text")
+    question_number: int = Field(..., ge=1, le=3, description="Question number (1, 2, or 3)")
+
+
 # ============================================================================
 # Book Schemas
 # ============================================================================
