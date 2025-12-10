@@ -46,6 +46,7 @@ def get_recommendations(
     query = session_data.get("initial_query")
     user_books = session_data.get("books_from_csv", [])  # List of {book_id, title, author, user_rating}
     follow_up_answers = session_data.get("follow_up_answers", {})
+    generated_questions = session_data.get("generated_questions", {})
 
     if not query:
         raise HTTPException(status_code=400, detail="Session has no query")
@@ -58,6 +59,7 @@ def get_recommendations(
             query=query,
             user_books=user_books if user_books else None,
             follow_up_answers=follow_up_answers if follow_up_answers else None,
+            generated_questions=generated_questions if generated_questions else None,
         )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
