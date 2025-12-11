@@ -228,6 +228,36 @@ def reset_session(
         logger.error(f"Failed to reset session {session_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to reset session")
 
+@router.put("/{session_id}/query")
+def update_query(
+    session_id: str,
+    initial_query: str = Form(..., min_length=1),
+    session_mgr: SessionManager = Depends(get_session_manager),
+) -> dict:
+    """Update the initial query for an existing session.
+
+    Used when user submits a new query with an existing session (e.g., after reset).
+
+    Args:
+        session_id: Session identifier
+        initial_query: New query text
+        session_mgr: Redis session manager
+
+    Returns:
+        Success confirmation
+    """
+    # Get existing session
+    session_data = session_mgr.get_session(session_id)
+    if not session_data:
+        raise HTTPException(status_code=404, detail="Session not found or expired")
+
+    # Update query
+    session_data["initial_query"] = initial_query
+    session_mgr.update_session(session_id, session_data)
+
+    logger.info(f"Updated query for session {session_id}")
+    return {"success": True, "message": "Query updated successfully"}
+
 @router.post("/{session_id}/generate-question", response_model=GenerateQuestionResponse)
 def generate_follow_up_question(
     session_id: str,

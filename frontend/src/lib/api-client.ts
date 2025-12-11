@@ -131,6 +131,22 @@ class APIClient {
 
 		return this.handleResponse<{ success: boolean }>(response);
 	}
+	
+	async updateQuery(sessionId: string, initialQuery: string): Promise<{ success: boolean }> {
+		const formData = new FormData();
+		formData.append("initial_query", initialQuery);
+
+		const response = await fetch(
+			`${this.baseURL}/api/sessions/${sessionId}/query`,
+			{
+				method: "PUT",
+				body: formData,
+			},
+		);
+
+		return this.handleResponse<{ success: boolean }>(response);
+	}
+
 	// ========================================================================
 	// Question Generation Endpoint (To be implemented in backend)
 	// ========================================================================
