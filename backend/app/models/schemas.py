@@ -38,6 +38,7 @@ class SessionResponse(BaseModel):
     session_id: str
     status: str = Field(..., description="processing_csv | ready")
     follow_up_questions: List[str]
+    expires_at: int = Field(..., description="Unix timestamp (ms) when session expires")
 
 
 class SessionAnswersResponse(BaseModel):

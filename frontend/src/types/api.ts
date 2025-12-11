@@ -10,6 +10,7 @@ export interface SessionResponse {
 	session_id: string;
 	status: "ready" | "processing_csv";
 	follow_up_questions: never[]; // Always empty - frontend handles UI
+	expires_at: number; // Unix timestamp (ms) when session expires
 }
 
 export interface SessionAnswersSubmit {
@@ -116,6 +117,7 @@ export interface APIError {
 
 export interface SessionState {
 	session_id: string | null;
+	expires_at: number | null; // Unix timestamp (ms) when session expires
 	initial_query: string;
 	csv_uploaded: boolean;
 	csv_status: CSVStatus;

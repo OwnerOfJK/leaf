@@ -36,13 +36,23 @@ export const sessionStorage = {
 		localStorage.setItem(`${SESSION_KEY}_state`, JSON.stringify(updated));
 	},
 
-	// Get full session state
+	// Get full session state (with automatic expiration check)
 	getSessionState(): Partial<SessionState> {
 		if (typeof window === "undefined") return {};
 		const stored = localStorage.getItem(`${SESSION_KEY}_state`);
 		if (!stored) return {};
+
 		try {
-			return JSON.parse(stored);
+			const state = JSON.parse(stored) as Partial<SessionState>;
+
+			// Client-side expiration check: if expires_at is in the past, auto-clear
+			if (state.expires_at && Date.now() > state.expires_at) {
+				console.log("Session expired (client-side check), clearing localStorage...");
+				this.clearAll();
+				return {};
+			}
+
+			return state;
 		} catch {
 			return {};
 		}

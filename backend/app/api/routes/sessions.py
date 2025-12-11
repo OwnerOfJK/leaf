@@ -1,12 +1,14 @@
 """API routes for session management."""
 
 import logging
+import time
 import uuid
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from app.config import get_settings
 from app.core.redis_client import SessionManager, get_session_manager
 from app.models.schemas import (
     GenerateQuestionRequest,
@@ -101,12 +103,17 @@ async def create_session(
                 detail="Failed to process CSV file. Please try again."
             )
 
+    # Calculate session expiration time (current time + TTL)
+    settings = get_settings()
+    expires_at = int((time.time() + settings.redis_session_ttl) * 1000)  # Convert to milliseconds
+
     # Follow-up questions are handled by the frontend (hardcoded UI prompts)
     # Backend returns empty array - frontend displays its own question set
     return SessionResponse(
         session_id=session_id,
         status=status,
         follow_up_questions=[],
+        expires_at=expires_at,
     )
 
 
