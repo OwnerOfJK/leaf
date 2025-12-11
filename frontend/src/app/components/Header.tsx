@@ -8,9 +8,9 @@ export function Header() {
 	const router = useRouter();
 	const session = useSession();
 
-	const handleLogoClick = () => {
+	const handleLogoClick = async () => {
 		// Reset session (keep CSV data but clear query/answers/questions)
-		session.resetSession();
+		await session.resetSession();
 		router.push("/");
 	};
 
@@ -30,7 +30,7 @@ export function Header() {
 					href="https://github.com/OwnerOfJK/leaf"
 					target="_blank"
 					rel="noopener noreferrer"
-					className="text-gray-600 hover:text-primary transition-colors"
+					className="text-gray-600 hover:text-secondary transition-colors"
 					aria-label="View on GitHub"
 				>
 					<Github className="w-5 h-5" />

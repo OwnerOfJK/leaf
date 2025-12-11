@@ -60,8 +60,9 @@ export default function Home() {
 				file,
 			);
 
-			// Save session info
+			// Save session info (including expiration)
 			session.setSessionId(response.session_id);
+			session.setExpiresAt(response.expires_at);
 			if (query.trim()) {
 				session.setInitialQuery(query.trim());
 			}
@@ -161,6 +162,7 @@ export default function Home() {
 
 				sessionId = response.session_id;
 				session.setSessionId(sessionId);
+				session.setExpiresAt(response.expires_at);
 				session.setInitialQuery(query.trim());
 
 				// If CSV was just uploaded now, wait for processing
@@ -173,6 +175,9 @@ export default function Home() {
 			} else {
 				// Session already exists (CSV was uploaded earlier), update query
 				session.setInitialQuery(query.trim());
+
+				// Update query in backend Redis session
+				await apiClient.updateQuery(sessionId, query.trim());
 			}
 
 			// Validate question generation before navigating
@@ -211,40 +216,25 @@ export default function Home() {
 		<div className="min-h-screen flex flex-col bg-background">
 			<Header />
 
-			<main className="flex-1 flex items-center justify-center px-4 py-12">
-				<div className="max-w-3xl w-full space-y-8">
+			<main className="flex-1 flex items-center justify-center px-4 py-8 md:py-12">
+				<div className="max-w-4xl w-full space-y-10">
 					{/* Hero Section */}
-					<div className="text-center space-y-4">
+					<div className="text-center space-y-3">
 						<h1 className="text-hero text-primary font-heading">
-							Discover your next favorite book
+							Find your next favorite book
 						</h1>
-						<p className="text-xl text-gray-600 max-w-2xl mx-auto">
-							Tell us about your reading preferences and get personalized
-							recommendations powered by AI
+						<p className="text-lg text-gray-600 max-w-2xl mx-auto">
+							Tell us what you're looking for and get AI-powered recommendations
 						</p>
 					</div>
 
-					{/* CSV Upload */}
-					<div className="space-y-3">
-						<CSVUpload
-							onFileSelect={handleFileSelect}
-							onClearFile={handleClearFile}
-							uploadStatus={csvUploadStatus}
-							uploadProgress={csvProgress}
-							fileName={csvFile?.name}
-							errorMessage={csvError || undefined}
-							alreadyUploaded={session.csv_uploaded}
-						/>
-					</div>
-
-					{/* Prompt Input */}
-					<div className="space-y-3">
+					{/* Main Input Section - The Focal Point */}
+					<div className="bg-white border-2 border-secondary/30 rounded-card shadow-lg p-8 md:p-10 space-y-6 hover:border-secondary/50 transition-colors">
 						<label
 							htmlFor="query"
-							className="text-lg font-semibold text-gray-900"
+							className="block text-2xl md:text-3xl font-bold text-gray-900 text-center"
 						>
 							What kind of book are you looking for?
-							<span className="text-error ml-1">*</span>
 						</label>
 
 						<Textarea
@@ -252,42 +242,55 @@ export default function Home() {
 							value={query}
 							onChange={(e) => setQuery(e.target.value)}
 							placeholder="I want something like Project Hail Mary but with more character development..."
-							className="min-h-[120px] text-base resize-none"
+							className="min-h-[160px] text-lg resize-none border-2 border-gray-300 focus:border-secondary focus:ring-2 focus:ring-secondary/20"
 							disabled={isSubmitting}
 						/>
-					</div>
-
-					{/* CTA Button */}
-					<div className="flex justify-center pt-4">
-						<Button
-							onClick={handleSubmit}
-							disabled={!canSubmit}
-							size="lg"
-							className="bg-accent hover:bg-accent-dark text-white font-semibold px-8 py-6 text-lg rounded-component btn-hover-lift disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							{isSubmitting ? "Processing..." : "Get Recommendations"}
-						</Button>
-					</div>
-
-					{/* Error Message */}
-					{generalError && (
-						<div className="bg-red-50 border-2 border-error rounded-component p-4 text-center">
-							<p className="text-error font-medium">{generalError}</p>
+						
+						{/* Optional CSV Upload - De-emphasized */}
+						<div className="space-y-3">
+							<CSVUpload
+								onFileSelect={handleFileSelect}
+								onClearFile={handleClearFile}
+								uploadStatus={csvUploadStatus}
+								uploadProgress={csvProgress}
+								fileName={csvFile?.name}
+								errorMessage={csvError || undefined}
+								alreadyUploaded={session.csv_uploaded}
+							/>
 						</div>
-					)}
+
+						{/* CTA Button */}
+						<div className="flex justify-center pt-2">
+							<Button
+								onClick={handleSubmit}
+								disabled={!canSubmit}
+								size="lg"
+								className="bg-accent hover:bg-accent-dark text-white font-bold px-12 py-7 text-xl rounded-component btn-hover-lift disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+							>
+								{isSubmitting ? "Processing..." : "Get My Recommendations"}
+							</Button>
+						</div>
+
+						{/* Error Message */}
+						{generalError && (
+							<div className="bg-red-50 border-2 border-error rounded-component p-4 text-center">
+								<p className="text-error font-medium">{generalError}</p>
+							</div>
+						)}
+					</div>
 
 					{/* Trust Indicators */}
-					<div className="pt-8 flex items-center justify-center gap-8 text-sm text-gray-600">
+					<div className="pt-4 flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-gray-600">
 						<div className="flex items-center gap-2">
-							<CheckCircle2 className="w-4 h-4 text-primary" />
+							<CheckCircle2 className="w-4 h-4 text-secondary" />
 							<span>Open source</span>
 						</div>
 						<div className="flex items-center gap-2">
-							<Shield className="w-4 h-4 text-primary" />
+							<Shield className="w-4 h-4 text-secondary" />
 							<span>Privacy-friendly</span>
 						</div>
 						<div className="flex items-center gap-2">
-							<BookOpen className="w-4 h-4 text-primary" />
+							<BookOpen className="w-4 h-4 text-secondary" />
 							<span>Your data stays yours</span>
 						</div>
 					</div>

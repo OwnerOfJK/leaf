@@ -16,7 +16,7 @@ export function Footer() {
 							href="https://github.com/OwnerOfJK/leaf"
 							target="_blank"
 							rel="noopener noreferrer"
-							className="text-sm text-gray-600 hover:text-primary transition-colors flex items-center gap-1"
+							className="text-sm text-gray-600 hover:text-secondary transition-colors flex items-center gap-1"
 						>
 							<Github className="w-4 h-4" />
 							GitHub

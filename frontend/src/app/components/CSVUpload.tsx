@@ -66,6 +66,9 @@ export function CSVUpload({
 	const handleClick = () => {
 		if (uploadStatus === "success" || alreadyUploaded) {
 			onClearFile();
+		} else if (uploadStatus === "error") {
+			// Clear error state first, then user can upload again
+			onClearFile();
 		} else {
 			fileInputRef.current?.click();
 		}
@@ -105,9 +108,9 @@ export function CSVUpload({
 	if (uploadStatus === "uploading") {
 		return (
 			<div className="w-full">
-				<div className="border-2 border-primary rounded-component p-6 bg-blue-50">
+				<div className="border-2 border-secondary rounded-component p-6 bg-icy-blue-light">
 					<div className="flex items-center gap-3 mb-3">
-						<FileText className="w-6 h-6 text-primary animate-pulse" />
+						<FileText className="w-6 h-6 text-secondary animate-pulse" />
 						<div className="flex-1">
 							<p className="font-medium text-gray-900">{fileName}</p>
 							<p className="text-sm text-gray-600">
@@ -166,31 +169,28 @@ export function CSVUpload({
           cursor-pointer transition-all duration-200
           ${
 						dragActive
-							? "border-primary bg-primary/5 scale-[1.02]"
-							: "border-gray-300 hover:border-primary hover:bg-gray-50"
+							? "border-secondary bg-icy-blue-light scale-[1.02]"
+							: "border-gray-300 hover:border-secondary hover:bg-icy-blue-light/50"
 					}
         `}
 			>
 				<div className="flex flex-col items-center text-center gap-4">
-					<div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-						<Upload className="w-8 h-8 text-primary" />
+					<div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center">
+						<Upload className="w-4 h-4 text-secondary" />
 					</div>
 
-					<div>
-						<p className="text-lg font-semibold text-gray-900 mb-1">
+					<div className="flex items-center gap-2 flex-wrap justify-center">
+						<p className="text-lg font-semibold text-gray-900">
 							Upload your Goodreads library
-						</p>
-						<p className="text-sm text-gray-600 mb-2">
-							Drag and drop your CSV file, or click to browse
 						</p>
 						<a
 							href="https://www.goodreads.com/review/import"
 							target="_blank"
 							rel="noopener noreferrer"
 							onClick={(e) => e.stopPropagation()}
-							className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+							className="text-sm text-secondary hover:underline"
 						>
-							How to export from Goodreads →
+							(How To)
 						</a>
 					</div>
 

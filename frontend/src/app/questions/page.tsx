@@ -58,6 +58,15 @@ export default function QuestionsPage() {
 			session.setQuestion(questionNum, response.question);
 		} catch (error) {
 			console.error("Failed to load question:", error);
+
+			// If session expired, clear and redirect to home
+			if (error instanceof Error && (error.message.includes("expired") || error.message.includes("not found"))) {
+				console.log("Session expired, redirecting to home...");
+				session.clearSession();
+				router.push("/");
+				return;
+			}
+
 			// Fallback to default question if generation fails
 			const fallbackQuestions = {
 				1: "What themes or subjects are you most drawn to in books?",
@@ -132,9 +141,9 @@ export default function QuestionsPage() {
 			{/* CSV Status Indicator - Always visible if CSV uploaded */}
 			{session.csv_uploaded && (
 				<div className="fixed top-20 right-4 z-50">
-					{session.csv_status === "processing" && (
-						<div className="bg-white rounded-lg shadow-lg px-4 py-3 flex items-center gap-2 border border-gray-200">
-							<Loader2 className="w-4 h-4 animate-spin text-primary" />
+					{(session.csv_status === "processing" || session.csv_status === "pending") && (
+						<div className="bg-icy-blue-light rounded-lg shadow-lg px-4 py-3 flex items-center gap-2 border border-secondary">
+							<Loader2 className="w-4 h-4 animate-spin text-secondary" />
 							<span className="text-sm text-gray-700">Processing library...</span>
 						</div>
 					)}
@@ -157,7 +166,7 @@ export default function QuestionsPage() {
 									<div
 										className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
 											step <= currentQuestion
-												? "bg-primary text-white scale-110"
+												? "bg-secondary text-white scale-110 shadow-lg shadow-secondary/30"
 												: "bg-gray-200 text-gray-500"
 										}`}
 									>
@@ -172,7 +181,7 @@ export default function QuestionsPage() {
 									<div
 										className={`h-1 flex-1 mx-2 transition-all ${
 											step < currentQuestion
-												? "bg-primary"
+												? "bg-secondary"
 												: "bg-gray-200"
 										}`}
 									/>
@@ -190,7 +199,7 @@ export default function QuestionsPage() {
 
 							{isLoadingQuestion ? (
 								<div className="flex items-center gap-3 py-4">
-									<Loader2 className="w-5 h-5 animate-spin text-primary" />
+									<Loader2 className="w-5 h-5 animate-spin text-secondary" />
 									<p className="text-lg text-gray-600">
 										Generating question...
 									</p>
@@ -219,7 +228,7 @@ export default function QuestionsPage() {
 
 						<button
 							onClick={handleSkip}
-							className="text-sm text-gray-500 hover:text-primary hover:underline transition-colors"
+							className="text-sm text-gray-500 hover:text-secondary hover:underline transition-colors"
 							disabled={isLoadingQuestion || isSubmitting}
 						>
 							Skip this question

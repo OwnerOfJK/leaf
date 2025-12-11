@@ -2,17 +2,16 @@
 @import "tailwindcss";
 
 @theme {
-	/* Design System Colors */
-	--color-primary: #4A7C59;
-	--color-primary-dark: #3a6347;
-	--color-secondary: #8B6F47;
-	--color-accent: #D4835C;
-	--color-accent-dark: #c46d48;
-	--color-background: #FAF7F0;
-	--color-background-darker: #F5F0E8;
+	/* Design System Colors - Vibrant Palette */
+	--color-primary: #072ac8;          /* Persian Blue */
+	--color-secondary: #1e96fc;        /* Dodger Blue */
+	--color-accent: #ffc600;           /* School Bus Yellow */
+	--color-accent-dark: #cca000;      /* School Bus Yellow 400 */
+	--color-icy-blue-light: #edf7fe;   /* Icy Blue 900 */
+	--color-background: #ffffff;       /* White */
+	--color-background-darker: #f8f9fa;
 	--color-text: #2D3436;
-	--color-text-light: #636e72;
-	--color-error: #d63031;
+	--color-error: #dc3545;
 	--color-success: #00b894;
 
 	/* Typography */
@@ -35,7 +34,8 @@
 }
 
 body {
-	background-color: var(--color-background);
+	background: linear-gradient(135deg, #ffffff 0%, #edf7fe 50%, #ffffff 100%);
+	background-attachment: fixed;
 	color: var(--color-text);
 	font-family: var(--font-family-body);
 	-webkit-font-smoothing: antialiased;
@@ -56,14 +56,6 @@ h1, h2, h3, h4, h5, h6 {
 	color: var(--color-secondary);
 }
 
-.text-accent {
-	color: var(--color-accent);
-}
-
-.bg-primary {
-	background-color: var(--color-primary);
-}
-
 .bg-secondary {
 	background-color: var(--color-secondary);
 }
@@ -73,19 +65,19 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .bg-background {
-	background-color: var(--color-background);
+	background: transparent;
 }
 
 .bg-background-darker {
 	background-color: var(--color-background-darker);
 }
 
-.border-primary {
-	border-color: var(--color-primary);
+.bg-icy-blue-light {
+	background-color: var(--color-icy-blue-light);
 }
 
-.hover\:bg-primary-dark:hover {
-	background-color: var(--color-primary-dark);
+.border-secondary {
+	border-color: var(--color-secondary);
 }
 
 .hover\:bg-accent-dark:hover {
@@ -142,7 +134,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .card-hover:hover {
 	transform: translateY(-4px);
-	box-shadow: var(--shadow-lg);
+	box-shadow: 0 20px 25px -5px rgb(7 42 200 / 0.15), 0 8px 10px -6px rgb(7 42 200 / 0.1);
 }
 
 /* Mobile responsive typography */
@@ -159,3 +151,5 @@ h1, h2, h3, h4, h5, h6 {
 		font-size: 1.25rem;
 	}
 }
+
+

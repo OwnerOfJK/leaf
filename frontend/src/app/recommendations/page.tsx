@@ -113,6 +113,10 @@ export default function RecommendationsPage() {
 		return "bg-yellow-100 text-yellow-800 border-yellow-200";
 	};
 
+	// Sort and reorder for podium effect: 2nd, 1st, 3rd (left to right)
+	const sorted = [...recommendations].sort((a, b) => a.rank - b.rank);
+	const podiumOrder = [sorted[1], sorted[0], sorted[2]];
+
 	if (!session.session_id) {
 		return null; // Will redirect via useEffect
 	}
@@ -123,7 +127,7 @@ export default function RecommendationsPage() {
 				<Header />
 				<main className="flex-1 flex items-center justify-center">
 					<div className="text-center space-y-4">
-						<Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+						<Loader2 className="w-12 h-12 animate-spin text-secondary mx-auto" />
 						<p className="text-xl text-gray-600">
 							Curating your perfect recommendations...
 						</p>
@@ -184,11 +188,6 @@ export default function RecommendationsPage() {
 		);
 	}
 
-	// Sort recommendations by rank
-	const sortedRecommendations = [...recommendations].sort(
-		(a, b) => a.rank - b.rank,
-	);
-
 	return (
 		<div className="min-h-screen flex flex-col bg-background">
 			<Header />
@@ -206,9 +205,9 @@ export default function RecommendationsPage() {
 						</p>
 					</div>
 
-					{/* Recommendations Grid */}
+					{/* Recommendations Grid - Podium Layout */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-						{sortedRecommendations.map((rec, index) => {
+						{podiumOrder.map((rec, index) => {
 							const isCenter = rec.rank === 1;
 							const userFeedback = feedback[rec.id];
 							const showSuccess = feedbackSuccess === rec.id;
@@ -218,10 +217,23 @@ export default function RecommendationsPage() {
 									key={rec.id}
 									className={`relative p-6 space-y-4 transition-all duration-300 card-hover ${
 										isCenter
-											? "md:scale-105 md:shadow-xl border-2 border-primary/20"
+											? "md:scale-105 md:shadow-xl border-2 border-secondary/40"
 											: "border border-gray-200"
 									}`}
 								>
+									{/* Rank Badge */}
+									<div
+										className={`absolute top-4 left-4 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shadow-lg ${
+											rec.rank === 1
+												? "bg-accent text-white"
+												: rec.rank === 2
+												? "bg-gray-400 text-white"
+												: "bg-orange-400 text-white"
+										}`}
+									>
+										#{rec.rank}
+									</div>
+
 									{/* Confidence Badge */}
 									<Badge
 										className={`absolute top-4 right-4 ${getConfidenceColor(
@@ -252,7 +264,7 @@ export default function RecommendationsPage() {
 											href={getAmazonLink(rec.book.isbn)}
 											target="_blank"
 											rel="noopener noreferrer"
-											className="text-xl font-bold text-gray-900 hover:text-primary hover:underline transition-colors flex items-center gap-1"
+											className="text-xl font-bold text-gray-900 hover:text-secondary hover:underline transition-colors flex items-center gap-1"
 										>
 											{rec.book.title}
 											<ExternalLink className="w-4 h-4" />
@@ -277,7 +289,7 @@ export default function RecommendationsPage() {
 															<Badge
 																key={category}
 																variant="secondary"
-																className="text-xs"
+																className="text-xs text-white"
 															>
 																{category}
 															</Badge>
@@ -351,7 +363,7 @@ export default function RecommendationsPage() {
 
 									{/* Success Message */}
 									{showSuccess && (
-										<div className="absolute bottom-4 left-4 right-4 bg-green-100 border border-green-200 rounded px-3 py-2 text-sm text-green-800 text-center animate-in fade-in slide-in-from-bottom-2">
+										<div className="absolute bottom-4 left-4 right-4 bg-green-100 border border-green-200 rounded px-2 py-2 text-sm text-green-800 text-center animate-in fade-in slide-in-from-bottom-2">
 											Thanks for your feedback!
 										</div>
 									)}
@@ -368,7 +380,7 @@ export default function RecommendationsPage() {
 						<Button
 							onClick={handleStartOver}
 							variant="outline"
-							className="hover:bg-primary hover:text-white"
+							className="hover:bg-secondary hover:text-white border-secondary/50 hover:border-secondary"
 						>
 							New Search
 						</Button>
