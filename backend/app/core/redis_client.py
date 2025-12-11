@@ -152,6 +152,34 @@ class SessionManager:
 
         return session_data.get("generated_questions", {})
 
+    def reset_session_data(self, session_id: str) -> None:
+        """Reset session questions and answers while keeping session_id and CSV data.
+
+        Clears:
+        - generated_questions
+        - follow_up_answers
+        - initial_query
+
+        Preserves:
+        - session_id
+        - csv_uploaded
+        - books_from_csv
+
+        Args:
+            session_id: Unique session identifier
+        """
+        session_data = self.get_session(session_id)
+        if not session_data:
+            raise ValueError(f"Session {session_id} not found")
+
+        # Clear questions and answers, reset query
+        session_data["generated_questions"] = {}
+        session_data["follow_up_answers"] = {}
+        session_data["initial_query"] = ""
+
+        # Update session with refreshed TTL
+        self.update_session(session_id, session_data)
+
 
 # Global session manager instance
 session_manager = SessionManager(redis_client)

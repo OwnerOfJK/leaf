@@ -7,6 +7,7 @@ import { apiClient } from "@/lib/api-client";
 
 interface SessionContextValue extends SessionState {
 	setSessionId: (id: string) => void;
+	setExpiresAt: (expiresAt: number) => void;
 	setInitialQuery: (query: string) => void;
 	setCsvUploaded: (uploaded: boolean) => void;
 	setCsvStatus: (status: CSVStatus) => void;
@@ -16,12 +17,14 @@ interface SessionContextValue extends SessionState {
 		answer: string | null,
 	) => Promise<void>;
 	setQuestion: (questionNum: 1 | 2 | 3, question: string | null) => void;
-	resetSession: () => void;
+	resetSession: () => Promise<void>;
 	clearCsvData: () => void;
+	clearSession: () => void;
 }
 
 const defaultState: SessionState = {
 	session_id: null,
+	expires_at: null,
 	initial_query: "",
 	csv_uploaded: false,
 	csv_status: "none",
@@ -45,10 +48,16 @@ const SessionContext = createContext<SessionContextValue | undefined>(
 export function SessionProvider({ children }: { children: React.ReactNode }) {
 	const [state, setState] = useState<SessionState>(defaultState);
 
-	// Load session from localStorage on mount
+	// Helper function to clear session (defined early for use in useEffect)
+	const clearSession = () => {
+		setState(defaultState);
+		sessionStorage.clearAll();
+	};
+
+	// Load session from localStorage on mount (with automatic expiration check)
 	useEffect(() => {
 		const sessionId = sessionStorage.getSessionId();
-		const storedState = sessionStorage.getSessionState();
+		const storedState = sessionStorage.getSessionState(); // Auto-validates expiration
 
 		if (sessionId || Object.keys(storedState).length > 0) {
 			setState((prev) => ({
@@ -56,6 +65,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 				session_id: sessionId,
 				...storedState,
 			}));
+
+			// Server-side validation: check if session still exists in Redis
+			if (sessionId) {
+				apiClient
+					.getSessionStatus(sessionId)
+					.catch((error) => {
+						// If session not found on server, clear everything
+						if (error.message.includes("expired") || error.message.includes("not found")) {
+							console.log("Session not found on server, clearing...");
+							clearSession();
+						}
+					});
+			}
 		}
 	}, []);
 
@@ -69,6 +91,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
 	const setSessionId = (id: string) => {
 		setState((prev) => ({ ...prev, session_id: id }));
+	};
+
+	const setExpiresAt = (expiresAt: number) => {
+		setState((prev) => ({ ...prev, expires_at: expiresAt }));
 	};
 
 	const setInitialQuery = (query: string) => {
@@ -127,8 +153,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 		}));
 	};
 
-	const resetSession = () => {
-		// Keep session_id and csv data, reset everything else (query, answers, questions, step)
+	const resetSession = async () => {
+		// Reset both frontend state and backend Redis session
+		const currentSessionId = state.session_id;
+
+		// Reset frontend state (keep session_id, and csv data)
 		setState((prev) => {
 			const resetState = {
 				...defaultState,
@@ -142,6 +171,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
 			return resetState;
 		});
+
+		// Reset backend Redis session (clear questions/answers)
+		if (currentSessionId) {
+			try {
+				await apiClient.resetSession(currentSessionId);
+				console.log("Backend session reset successfully");
+			} catch (error) {
+				console.error("Failed to reset backend session:", error);
+				// Continue anyway - frontend is reset
+			}
+		}
 	};
 
 	const clearCsvData = () => {
@@ -155,6 +195,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 	const value: SessionContextValue = {
 		...state,
 		setSessionId,
+		setExpiresAt,
 		setInitialQuery,
 		setCsvUploaded,
 		setCsvStatus,
@@ -163,6 +204,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 		setQuestion,
 		resetSession,
 		clearCsvData,
+		clearSession,
 	};
 
 	return (

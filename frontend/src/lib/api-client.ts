@@ -121,6 +121,16 @@ class APIClient {
 		return this.handleResponse<SessionAnswersResponse>(response);
 	}
 
+	async resetSession(sessionId: string): Promise<{ success: boolean }> {
+		const response = await fetch(
+			`${this.baseURL}/api/sessions/${sessionId}/reset`,
+			{
+				method: "POST",
+			},
+		);
+
+		return this.handleResponse<{ success: boolean }>(response);
+	}
 	// ========================================================================
 	// Question Generation Endpoint (To be implemented in backend)
 	// ========================================================================

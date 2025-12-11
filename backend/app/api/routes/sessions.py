@@ -201,6 +201,33 @@ def get_session_status(
     return response
 
 
+@router.post("/{session_id}/reset")
+def reset_session(
+    session_id: str,
+    session_mgr: SessionManager = Depends(get_session_manager),
+) -> dict:
+    """Reset session questions and answers while keeping CSV data.
+
+    Clears generated questions and follow-up answers from Redis,
+    but preserves session_id and uploaded CSV data.
+
+    Args:
+        session_id: Session identifier
+        session_mgr: Redis session manager
+
+    Returns:
+        Success confirmation
+    """
+    try:
+        session_mgr.reset_session_data(session_id)
+        logger.info(f"Reset session data for session {session_id}")
+        return {"success": True, "message": "Session reset successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to reset session {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to reset session")
+
 @router.post("/{session_id}/generate-question", response_model=GenerateQuestionResponse)
 def generate_follow_up_question(
     session_id: str,
