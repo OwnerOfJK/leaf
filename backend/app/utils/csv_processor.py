@@ -17,6 +17,7 @@ ISBN13_COLUMN = "ISBN13"
 TITLE_COLUMN = "Title"
 AUTHOR_COLUMN = "Author"
 RATING_COLUMN = "My Rating"
+EXCLUSIVE_SHELF_COLUMN = "Exclusive Shelf"
 
 
 def clean_isbn(isbn_value: Any) -> str | None:
@@ -72,7 +73,8 @@ def parse_goodreads_csv(file_path: Path) -> list[dict[str, Any]]:
                 'isbn13': str | None,
                 'title': str,
                 'author': str,
-                'user_rating': int  # 0-5
+                'user_rating': int,  # 0-5
+                'exclusive_shelf': str  # 'read', 'to-read', 'currently-reading', etc.
             },
             ...
         ]
@@ -89,7 +91,7 @@ def parse_goodreads_csv(file_path: Path) -> list[dict[str, Any]]:
         df = pd.read_csv(file_path)
 
         # Validate required columns exist
-        required_columns = [ISBN_COLUMN, ISBN13_COLUMN, TITLE_COLUMN, AUTHOR_COLUMN, RATING_COLUMN]
+        required_columns = [ISBN_COLUMN, ISBN13_COLUMN, TITLE_COLUMN, AUTHOR_COLUMN, RATING_COLUMN, EXCLUSIVE_SHELF_COLUMN]
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             raise ValueError(f"CSV missing required columns: {missing_columns}")
@@ -121,12 +123,16 @@ def parse_goodreads_csv(file_path: Path) -> list[dict[str, Any]]:
                 logger.warning(f"Invalid rating for '{title}': {row[RATING_COLUMN]}, defaulting to 0")
                 user_rating = 0
 
+            # Extract exclusive shelf (read, to-read, currently-reading, etc.)
+            exclusive_shelf = str(row[EXCLUSIVE_SHELF_COLUMN]).strip().lower() if pd.notna(row[EXCLUSIVE_SHELF_COLUMN]) else "read"
+
             books.append({
                 "isbn": isbn,
                 "isbn13": isbn13,
                 "title": title,
                 "author": author,
-                "user_rating": user_rating
+                "user_rating": user_rating,
+                "exclusive_shelf": exclusive_shelf
             })
 
         logger.info(

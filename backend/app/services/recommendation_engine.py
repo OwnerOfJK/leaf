@@ -54,7 +54,7 @@ def generate_recommendations(
         db: Database session
         session_id: Session identifier
         query: User's initial query
-        user_books: Optional list of {book_id, title, author, user_rating} from CSV
+        user_books: Optional list of {book_id, title, author, user_rating, exclusive_shelf} from CSV
         follow_up_answers: Optional dictionary of follow-up answers
         generated_questions: Optional dictionary of generated questions
 
@@ -159,7 +159,7 @@ def _retrieve_candidates(
     Args:
         db: Database session
         query: Enhanced query string
-        user_books: Optional list of {book_id, title, author, user_rating}
+        user_books: Optional list of {book_id, title, author, user_rating, exclusive_shelf}
         top_k: Total candidates to return
 
     Returns:
@@ -173,10 +173,17 @@ def _retrieve_candidates(
 
     # Dynamic collaborative filtering based on semantic relevance
     if user_books:
-        exclude_ids = [b['book_id'] for b in user_books]
+        # Only exclude books that have been read, not books marked as to-read or currently-reading
+        exclude_ids = [b['book_id'] for b in user_books if b.get('exclusive_shelf') == 'read']
 
-        # Filter high-rated books (4-5 stars) by semantic relevance to query
-        high_rated_books = [b for b in user_books if b['user_rating'] >= HIGH_RATING_THRESHOLD]
+
+
+        # Filter high-rated books (4-5 stars) that have been read by semantic relevance to query
+        # Only use read books for collaborative filtering (not to-read or currently-reading)
+        high_rated_books = [
+            b for b in user_books
+            if b['user_rating'] >= HIGH_RATING_THRESHOLD and b.get('exclusive_shelf') == 'read'
+        ]
 
         if high_rated_books:
             relevant_books = _filter_relevant_books(
@@ -228,7 +235,7 @@ def _generate_with_llm(
     Args:
         query: User's query
         candidate_books: Candidate books from retrieval
-        user_books: Optional list of {book_id, title, author, user_rating} for context
+        user_books: Optional list of {book_id, title, author, user_rating, exclusive_shelf} for context
 
     Returns:
         List of dicts with book_id, confidence_score, explanation, rank
@@ -237,11 +244,12 @@ def _generate_with_llm(
     context = f"User query: {query}\n\n"
 
     if user_books:
-        # Extract user preferences
-        high_rated = [b for b in user_books if b['user_rating'] >= HIGH_RATING_THRESHOLD]
-        low_rated = [b for b in user_books if b['user_rating'] <= DISLIKE_THRESHOLD]
+        # Extract user preferences (only from read books)
+        read_books = [b for b in user_books if b.get('exclusive_shelf') == 'read']
+        high_rated = [b for b in read_books if b['user_rating'] >= HIGH_RATING_THRESHOLD]
+        low_rated = [b for b in read_books if b['user_rating'] > 0 and b['user_rating'] <= DISLIKE_THRESHOLD]
 
-        context += f"User's reading history: {len(user_books)} books\n\n"
+        context += f"User's reading history: {len(read_books)} books read\n\n"
 
         # Add favorite books
         if high_rated:
@@ -261,9 +269,9 @@ def _generate_with_llm(
                 context += f"  ... and {len(low_rated) - MAX_DISLIKES_IN_CONTEXT} more\n"
             context += "\n"
 
-        # Add rating distribution
+        # Add rating distribution (only for read books)
         rating_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-        for book in user_books:
+        for book in read_books:
             rating = int(book['user_rating'])
             if rating in rating_counts:
                 rating_counts[rating] += 1
@@ -363,7 +371,7 @@ def _filter_relevant_books(
     Args:
         db: Database session
         query_embedding: Query embedding vector
-        user_books: List of {book_id, title, author, user_rating}
+        user_books: List of {book_id, title, author, user_rating, exclusive_shelf}
         similarity_threshold: Minimum cosine similarity (default 0.3)
 
     Returns:
@@ -408,7 +416,7 @@ def _apply_dislike_penalties(
     Args:
         db: Database session
         candidates: List of candidate books with similarity scores
-        user_books: Optional list of {book_id, title, author, user_rating}
+        user_books: Optional list of {book_id, title, author, user_rating, exclusive_shelf}
 
     Returns:
         Candidates with penalties applied and re-sorted
@@ -416,8 +424,12 @@ def _apply_dislike_penalties(
     if not user_books:
         return candidates
 
-    # Get disliked books (rated 1-2 stars)
-    disliked_books = [b for b in user_books if b['user_rating'] <= DISLIKE_THRESHOLD]
+    # Get disliked books (rated 1-2 stars) that have been read
+    # Exclude books with rating 0 (not rated)
+    disliked_books = [
+        b for b in user_books
+        if b['user_rating'] > 0 and b['user_rating'] <= DISLIKE_THRESHOLD and b.get('exclusive_shelf') == 'read'
+    ]
 
     if not disliked_books:
         return candidates

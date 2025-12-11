@@ -27,7 +27,7 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
        - If not, fetches metadata from Google Books API
        - Generates embedding
        - Inserts into database
-    3. Updates Redis session with user's book IDs and ratings
+    3. Updates Redis session with user's book IDs, ratings, and read status
     4. Updates CSV processing status
 
     Args:
@@ -64,10 +64,10 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
         books_added = 0
         books_existing = 0
         books_failed = 0
-        user_books = []  # List of {book_id, title, author, user_rating}
+        user_books = []  # List of {book_id, title, author, user_rating, exclusive_shelf}
 
         # Pass 1: Collect existing books and new books needing embeddings
-        new_books_to_add = []  # List of {google_data, embedding_text, user_rating}
+        new_books_to_add = []  # List of {google_data, embedding_text, user_rating, exclusive_shelf}
 
         for idx, book_data in enumerate(books_from_csv, 1):
             try:
@@ -102,7 +102,8 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                         "book_id": existing_book.id,
                         "title": existing_book.title,
                         "author": existing_book.author,
-                        "user_rating": book_data["user_rating"]
+                        "user_rating": book_data["user_rating"],
+                        "exclusive_shelf": book_data["exclusive_shelf"]
                     })
                     logger.debug(f"Book exists: {existing_book.title} (ID: {existing_book.id})")
                     continue
@@ -141,7 +142,8 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                 new_books_to_add.append({
                     "google_data": google_data,
                     "embedding_text": embedding_text,
-                    "user_rating": book_data["user_rating"]
+                    "user_rating": book_data["user_rating"],
+                    "exclusive_shelf": book_data["exclusive_shelf"]
                 })
 
                 logger.debug(
@@ -205,7 +207,8 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                         "book_id": new_book.id,
                         "title": new_book.title,
                         "author": new_book.author,
-                        "user_rating": book_info["user_rating"]
+                        "user_rating": book_info["user_rating"],
+                        "exclusive_shelf": book_info["exclusive_shelf"]
                     })
 
                     logger.info(f"Added new book: {new_book.title} (ID: {new_book.id})")
@@ -223,6 +226,7 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
         if session_data:
             session_data["books_from_csv"] = user_books
             session_data["csv_uploaded"] = True
+
             session_manager.update_session(session_id, session_data)
 
         # Update status to completed
