@@ -18,6 +18,8 @@ import { useSession } from "@/contexts/SessionContext";
 import { apiClient } from "@/lib/api-client";
 import type { Recommendation } from "@/types/api";
 
+const AMAZON_TAG = "leaf07-21"
+
 export default function RecommendationsPage() {
 	const router = useRouter();
 	const session = useSession();
@@ -102,7 +104,7 @@ export default function RecommendationsPage() {
 	};
 
 	const getAmazonLink = (isbn: string) => {
-		return `https://www.amazon.com/dp/${isbn}`;
+		return `https://www.amazon.com/dp/${isbn}/?tag=${AMAZON_TAG}`;
 	};
 
 	const getConfidenceColor = (score: number) => {
