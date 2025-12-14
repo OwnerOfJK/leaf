@@ -137,25 +137,21 @@ export default function QuestionsPage() {
 	return (
 		<div className="min-h-screen flex flex-col bg-background">
 			<Header />
-
 			{/* CSV Status Indicator - Always visible if CSV uploaded */}
-			{session.csv_uploaded && (
-				<div className="fixed top-20 right-4 z-50">
-					{(session.csv_status === "processing" || session.csv_status === "pending") && (
-						<div className="bg-icy-blue-light rounded-lg shadow-lg px-4 py-3 flex items-center gap-2 border border-secondary">
-							<Loader2 className="w-4 h-4 animate-spin text-secondary" />
-							<span className="text-sm text-gray-700">Processing library...</span>
-						</div>
-					)}
-					{session.csv_status === "completed" && (
-						<div className="bg-green-50 rounded-lg shadow-lg px-4 py-3 flex items-center gap-2 border border-green-200">
-							<CheckCircle2 className="w-4 h-4 text-green-600" />
-							<span className="text-sm text-green-700">Library ready!</span>
-						</div>
-					)}
-				</div>
-			)}
-
+			<div className="fixed top-20 right-4 z-50">
+				{(session.csv_status === "processing" || session.csv_status === "pending") && (
+					<div className="bg-icy-blue-light rounded-lg shadow-lg px-4 py-3 flex items-center gap-2 border border-secondary">
+						<Loader2 className="w-4 h-4 animate-spin text-secondary" />
+						<span className="text-sm text-gray-700">Processing library...</span>
+					</div>
+				)}
+				{session.csv_status === "completed" && (
+					<div className="bg-green-50 rounded-lg shadow-lg px-4 py-3 flex items-center gap-2 border border-green-200">
+						<CheckCircle2 className="w-4 h-4 text-green-600" />
+						<span className="text-sm text-green-700">Library ready!</span>
+					</div>
+				)}
+			</div>
 			<main className="flex-1 flex items-center justify-center px-4 py-12">
 				<div className="max-w-2xl w-full space-y-8">
 					{/* Progress Indicator */}
