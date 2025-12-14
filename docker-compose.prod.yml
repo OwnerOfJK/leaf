@@ -47,8 +47,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "8000:8000"
+    # Port 8000 NOT exposed - backend is internal only
+    # Accessible to frontend via http://backend:8000 (Docker network)
     networks:
       - leaf-network
     healthcheck:
@@ -78,10 +78,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: leaf-frontend
     restart: unless-stopped
+    environment:
+      # Backend URL for Next.js API routes (server-side)
+      - BACKEND_INTERNAL_URL=http://backend:8000
+    depends_on:
+      - backend
     ports:
       - "3000:3000"
     networks:

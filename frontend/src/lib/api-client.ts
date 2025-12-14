@@ -11,8 +11,8 @@ import type {
 	APIError,
 } from "@/types/api";
 
-const API_BASE_URL =
-	process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Use nextjs proxy routes with same domain
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ""
 
 class APIClient {
 	private baseURL: string;
