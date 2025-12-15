@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Upload, CheckCircle, XCircle, X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import Image from "next/image";
 
 interface CSVUploadProps {
 	onFileSelect: (file: File) => void;
@@ -175,9 +176,13 @@ export function CSVUpload({
         `}
 			>
 				<div className="flex flex-col items-center text-center gap-4">
-					<div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center">
-						<Upload className="w-4 h-4 text-secondary" />
-					</div>
+					<Image
+						src="/svgs/undraw_cloud-upload.svg"
+						alt="Upload illustration"
+						width={20}
+						height={20}
+						className="opacity-90"
+					/>
 
 					<div className="flex items-center gap-2 flex-wrap justify-center">
 						<p className="text-lg font-semibold text-gray-900">

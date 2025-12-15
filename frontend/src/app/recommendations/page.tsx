@@ -129,7 +129,7 @@ export default function RecommendationsPage() {
 					<div className="text-center space-y-4">
 						<Loader2 className="w-12 h-12 animate-spin text-secondary mx-auto" />
 						<p className="text-xl text-gray-600">
-							Curating your perfect recommendations...
+							Curating your recommendations...
 						</p>
 					</div>
 				</main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
@@ -26,20 +26,8 @@ export default function QuestionsPage() {
 			router.push("/");
 		}
 	}, [session.session_id, router]);
-
-	// Load question when component mounts or question number changes
-	useEffect(() => {
-		loadQuestion(currentQuestion);
-	}, [currentQuestion]);
-
-	// Load answer for current question if it exists
-	useEffect(() => {
-		const existingAnswer =
-			session.answers[`question_${currentQuestion}` as keyof typeof session.answers];
-		setCurrentAnswer(existingAnswer || "");
-	}, [currentQuestion, session.answers]);
-
-	const loadQuestion = async (questionNum: 1 | 2 | 3) => {
+	
+	const loadQuestion = useCallback(async (questionNum: 1 | 2 | 3) => {
 		// Check if we already have this question loaded
 		const existingQuestion =
 			session.questions[`question_${questionNum}` as keyof typeof session.questions];
@@ -51,10 +39,10 @@ export default function QuestionsPage() {
 		setIsLoadingQuestion(true);
 
 		try {
-	  if (!session.session_id) return;
-      const response = await apiClient.generateQuestion(session.session_id, {
-        question_number: questionNum,
-      });
+			if (!session.session_id) return;
+			const response = await apiClient.generateQuestion(session.session_id, {
+				question_number: questionNum,
+			});
 			session.setQuestion(questionNum, response.question);
 		} catch (error) {
 			console.error("Failed to load question:", error);
@@ -77,7 +65,19 @@ export default function QuestionsPage() {
 		} finally {
 			setIsLoadingQuestion(false);
 		}
-	};
+	}, [session]);
+
+	// Load question when component mounts or question number changes
+	useEffect(() => {
+		loadQuestion(currentQuestion);
+	}, [currentQuestion, loadQuestion]);
+
+	// Load answer for current question if it exists
+	useEffect(() => {
+		const existingAnswer =
+			session.answers[`question_${currentQuestion}` as keyof typeof session.answers];
+		setCurrentAnswer(existingAnswer || "");
+	}, [currentQuestion, session.answers]);
 
 	const handleBack = async () => {
 		// Save current answer before going back (syncs to backend automatically)
@@ -128,8 +128,6 @@ export default function QuestionsPage() {
 	const currentQuestionText =
 		session.questions[`question_${currentQuestion}` as keyof typeof session.questions];
 
-	const progressPercentage = (currentQuestion / 3) * 100;
-
 	if (!session.session_id) {
 		return null; // Will redirect via useEffect
 	}
@@ -155,10 +153,10 @@ export default function QuestionsPage() {
 			<main className="flex-1 flex items-center justify-center px-4 py-12">
 				<div className="max-w-2xl w-full space-y-8">
 					{/* Progress Indicator */}
-					<div className="flex items-center justify-between mb-8">
+					<div className="flex items-center mb-8">
 						{[1, 2, 3].map((step) => (
-							<div key={step} className="flex items-center flex-1">
-								<div className="flex flex-col items-center flex-1">
+							<React.Fragment key={step}>
+								<div className="flex flex-col items-center">
 									<div
 										className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
 											step <= currentQuestion
@@ -168,21 +166,21 @@ export default function QuestionsPage() {
 									>
 										{step}
 									</div>
-									<p className="text-xs mt-2 text-gray-600">
+									<p className="text-xs mt-2 text-gray-600 whitespace-nowrap">
 										Question {step}
 									</p>
 								</div>
 
 								{step < 3 && (
 									<div
-										className={`h-1 flex-1 mx-2 transition-all ${
+										className={`h-1 flex-1 mx-4 transition-all ${
 											step < currentQuestion
 												? "bg-secondary"
 												: "bg-gray-200"
 										}`}
 									/>
 								)}
-							</div>
+							</React.Fragment>
 						))}
 					</div>
 

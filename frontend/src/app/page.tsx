@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, BookOpen, Shield } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
 import { apiClient } from "@/lib/api-client";
+import Image from "next/image";
 
 export default function Home() {
 	const router = useRouter();
@@ -220,6 +221,15 @@ export default function Home() {
 				<div className="max-w-4xl w-full space-y-10">
 					{/* Hero Section */}
 					<div className="text-center space-y-3">
+						<div className="flex justify-center mb-4">
+							<Image
+								src="/svgs/undraw_chat-text.svg"
+								alt="Chat illustration"
+								width={40}
+								height={40}
+								className="opacity-90"
+							/>
+						</div>
 						<h1 className="text-hero text-primary font-heading">
 							Find your next favorite book
 						</h1>
@@ -229,10 +239,20 @@ export default function Home() {
 					</div>
 
 					{/* Main Input Section - The Focal Point */}
-					<div className="bg-white border-2 border-secondary/30 rounded-card shadow-lg p-8 md:p-10 space-y-6 hover:border-secondary/50 transition-colors">
+					<div className="relative bg-white border-2 border-secondary/30 rounded-card shadow-lg p-8 md:p-10 space-y-6 hover:border-secondary/50 transition-colors overflow-hidden">
+						{/* Decorative Coffee Background */}
+						<div className="absolute -bottom-6 -right-6 opacity-5 pointer-events-none">
+							<Image
+								src="/svgs/undraw_coffee.svg"
+								alt=""
+								width={150}
+								height={150}
+							/>
+						</div>
+
 						<label
 							htmlFor="query"
-							className="block text-2xl md:text-3xl font-bold text-gray-900 text-center"
+							className="block text-2xl md:text-3xl font-bold text-gray-900 text-center relative z-10"
 						>
 							What kind of book are you looking for?
 						</label>
@@ -242,7 +262,7 @@ export default function Home() {
 							value={query}
 							onChange={(e) => setQuery(e.target.value)}
 							placeholder="I want something like Project Hail Mary but with more character development..."
-							className="min-h-[160px] text-lg resize-none border-2 border-gray-300 focus:border-secondary focus:ring-2 focus:ring-secondary/20"
+							className="relative z-10 min-h-[160px] text-lg resize-none border-2 border-gray-300 focus:border-secondary focus:ring-2 focus:ring-secondary/20"
 							disabled={isSubmitting}
 						/>
 						
@@ -291,7 +311,7 @@ export default function Home() {
 						</div>
 						<div className="flex items-center gap-2">
 							<BookOpen className="w-4 h-4 text-secondary" />
-							<span>Your data stays yours</span>
+							<span>No user data stored</span>
 						</div>
 					</div>
 				</div>
