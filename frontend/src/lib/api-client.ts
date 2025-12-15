@@ -12,7 +12,7 @@ import type {
 } from "@/types/api";
 
 // Use nextjs proxy routes with same domain
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ""
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 class APIClient {
 	private baseURL: string;

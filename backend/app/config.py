@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load .env file into os.environ BEFORE Settings initialization
 # This is required for Langfuse decorators (@observe) and OpenAI wrapper to work
-_env_path = Path(__file__).parent.parent / ".env"
+_env_path = Path(__file__).parent.parent / ".env.local"
 load_dotenv(dotenv_path=_env_path, override=True)
 
 
@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     database_url: str
 
     # Redis
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = "redis://redis:6379/0"
     redis_session_ttl: int = 3600  # 1 hour in seconds
 
     # OpenAI
@@ -49,8 +49,8 @@ class Settings(BaseSettings):
     nyt_books_api_key: str
 
     # Celery
-    celery_broker_url: str = "redis://localhost:6379/1"
-    celery_result_backend: str = "redis://localhost:6379/2"
+    celery_broker_url: str = "redis://redis:6379/1"
+    celery_result_backend: str = "redis://redis:6379/2"
 
     @property
     def cors_origins(self) -> list[str]:
