@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -14,7 +12,7 @@ services:
     networks:
       - leaf-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,12 +39,14 @@ services:
     container_name: leaf-backend
     restart: unless-stopped
     env_file:
-      - ./backend/.env
+      - ./backend/.env.prod
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - csv_uploads:/tmp/leaf_csv_uploads
     # Port 8000 NOT exposed - backend is internal only
     # Accessible to frontend via http://backend:8000 (Docker network)
     networks:
@@ -65,12 +65,14 @@ services:
     restart: unless-stopped
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
     env_file:
-      - ./backend/.env
+      - ./backend/.env.prod
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - csv_uploads:/tmp/leaf_csv_uploads
     networks:
       - leaf-network
 
@@ -80,9 +82,8 @@ services:
       dockerfile: Dockerfile.prod
     container_name: leaf-frontend
     restart: unless-stopped
-    environment:
-      # Backend URL for Next.js API routes (server-side)
-      - BACKEND_INTERNAL_URL=http://backend:8000
+    env_file:
+      - ./frontend/.env.prod
     depends_on:
       - backend
     ports:
@@ -102,3 +103,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  csv_uploads:
