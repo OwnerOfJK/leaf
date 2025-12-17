@@ -93,7 +93,8 @@ def fetch_from_google_books(isbn: str) -> dict[str, Any] | None:
             authors = volume_info.get("authors", [])
             author = ", ".join(authors) if authors else "Unknown Author"
 
-            # Extract ISBN-13
+            # Extract both ISBN-10 and ISBN-13 from Google Books
+            isbn10 = extract_isbn10(volume_info)
             isbn13 = extract_isbn13(volume_info)
 
             # Extract publication year
@@ -109,8 +110,8 @@ def fetch_from_google_books(isbn: str) -> dict[str, Any] | None:
 
             # Build result dictionary
             result = {
-                "isbn": isbn,
-                "isbn13": isbn13,
+                "isbn": isbn10,  # Use ISBN-10 from Google Books (may be None)
+                "isbn13": isbn13,  # Use ISBN-13 from Google Books
                 "title": volume_info.get("title", "Unknown Title"),
                 "author": author,
                 "description": volume_info.get("description"),
@@ -138,6 +139,24 @@ def fetch_from_google_books(isbn: str) -> dict[str, Any] | None:
         except (KeyError, ValueError) as e:
             logger.error(f"Error parsing Google Books response for ISBN {isbn}: {e}")
             return None
+
+    return None
+
+
+def extract_isbn10(volume_info: dict[str, Any]) -> str | None:
+    """Extract ISBN-10 from Google Books volume info.
+
+    Args:
+        volume_info: The volumeInfo object from Google Books API response
+
+    Returns:
+        ISBN-10 string or None if not found
+    """
+    industry_identifiers = volume_info.get("industryIdentifiers", [])
+
+    for identifier in industry_identifiers:
+        if identifier.get("type") == "ISBN_10":
+            return identifier.get("identifier")
 
     return None
 
