@@ -21,3 +21,53 @@ claude:
 
   clear && claude \
     --append-system-prompt "$PROMPT"
+
+# Start databases only
+start-db:
+    docker compose up -d postgres redis
+
+# Start backend API server
+start-backend:
+    cd backend && source .venv/bin/activate && uvicorn main:app --reload --host 0.0.0.0
+
+# Start Celery worker
+start-worker:
+    cd backend && source .venv/bin/activate && celery -A app.workers.celery_app worker --loglevel=info
+
+# Start frontend dev server
+start-frontend:
+    cd frontend && npm run dev
+
+# Start all services
+start:
+    #!/usr/bin/env bash
+    # Clean previous instances
+    echo "Cleaning previous containers and processes..."
+    docker compose down
+    pkill -f "uvicorn main:app" || true
+    pkill -f "celery.*worker" || true
+    pkill -f "next-server" || true
+
+    echo "Starting databases..."
+    just start-db
+    echo "Waiting for databases to be ready..."
+    sleep 3
+
+    echo "Starting services (Ctrl+C to stop all)..."
+
+    cleanup() {
+        echo ""
+        echo "Stopping services..."
+        pkill -f "uvicorn main:app" || true
+        pkill -f "celery.*worker" || true
+        pkill -f "next-server" || true
+        echo "All services stopped."
+        exit 0
+    }
+
+    trap cleanup SIGINT SIGTERM
+
+    just start-backend & \
+    just start-worker & \
+    just start-frontend & \
+    wait
