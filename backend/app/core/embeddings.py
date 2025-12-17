@@ -3,20 +3,20 @@
 from typing import List
 
 from langfuse.openai import OpenAI
+from langfuse.decorators import observe
 
 from app.config import get_settings
 
 settings = get_settings()
 
 # Initialize OpenAI client with Langfuse wrapper
-# This automatically tracks all OpenAI calls in Langfuse
 openai_client = OpenAI(api_key=settings.openai_api_key)
 
 # Embedding model configuration
 EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIMENSIONS = 1536
 
-
+@observe()
 def create_embedding(text: str) -> List[float]:
     """Generate embedding for a single text.
 
@@ -32,7 +32,7 @@ def create_embedding(text: str) -> List[float]:
     )
     return response.data[0].embedding
 
-
+@observe()
 def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
     """Generate embeddings for multiple texts in a single API call.
 
