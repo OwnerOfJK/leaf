@@ -13,6 +13,7 @@ import {
 	Loader2,
 	BookOpen,
 	ExternalLink,
+	CheckCircle,
 } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
 import { apiClient } from "@/lib/api-client";
@@ -108,9 +109,9 @@ export default function RecommendationsPage() {
 	};
 
 	const getConfidenceColor = (score: number) => {
-		if (score >= 80) return "bg-green-100 text-green-800 border-green-200";
-		if (score >= 60) return "bg-blue-100 text-blue-800 border-blue-200";
-		return "bg-yellow-100 text-yellow-800 border-yellow-200";
+		if (score >= 80) return "bg-success/10 text-success border-success/30";
+		if (score >= 60) return "bg-secondary/10 text-secondary border-secondary/30";
+		return "bg-accent/20 text-primary border-accent/40";
 	};
 
 	// Sort and reorder for podium effect: 2nd, 1st, 3rd (left to right)
@@ -126,11 +127,17 @@ export default function RecommendationsPage() {
 			<div className="min-h-screen flex flex-col bg-background">
 				<Header />
 				<main className="flex-1 flex items-center justify-center">
-					<div className="text-center space-y-4">
-						<Loader2 className="w-12 h-12 animate-spin text-secondary mx-auto" />
-						<p className="text-xl text-gray-600">
-							Curating your recommendations...
-						</p>
+					<div className="text-center space-y-5 opacity-0 animate-fade-in">
+						<BookOpen className="w-16 h-16 text-accent mx-auto opacity-80 animate-pulse" strokeWidth={1.5} />
+						<div className="space-y-2">
+							<Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+							<p className="text-2xl text-primary font-heading font-bold">
+								Curating Your Selections
+							</p>
+							<p className="text-lg text-muted">
+								Finding the perfect books just for you...
+							</p>
+						</div>
 					</div>
 				</main>
 				<Footer />
@@ -143,15 +150,15 @@ export default function RecommendationsPage() {
 			<div className="min-h-screen flex flex-col bg-background">
 				<Header />
 				<main className="flex-1 flex items-center justify-center px-4">
-					<div className="max-w-md text-center space-y-6">
-						<BookOpen className="w-16 h-16 text-gray-400 mx-auto" />
-						<h2 className="text-h2 text-gray-900">
-							Hmm, we couldn't find great matches
+					<div className="max-w-md text-center space-y-6 paper-card p-8 rounded-card opacity-0 animate-fade-in-up">
+						<BookOpen className="w-16 h-16 text-muted mx-auto opacity-50" strokeWidth={1.5} />
+						<h2 className="text-h2 text-primary">
+							We couldn't find perfect matches
 						</h2>
-						<p className="text-gray-600">{error}</p>
+						<p className="text-muted">{error}</p>
 						<Button
 							onClick={loadRecommendations}
-							className="bg-accent hover:bg-accent-dark text-white"
+							className="bg-primary hover:bg-primary/90 text-cream font-bold btn-hover-lift"
 						>
 							Try Again
 						</Button>
@@ -167,17 +174,17 @@ export default function RecommendationsPage() {
 			<div className="min-h-screen flex flex-col bg-background">
 				<Header />
 				<main className="flex-1 flex items-center justify-center px-4">
-					<div className="max-w-md text-center space-y-6">
-						<BookOpen className="w-16 h-16 text-gray-400 mx-auto" />
-						<h2 className="text-h2 text-gray-900">
-							Hmm, we couldn't find great matches
+					<div className="max-w-md text-center space-y-6 paper-card p-8 rounded-card opacity-0 animate-fade-in-up">
+						<BookOpen className="w-16 h-16 text-muted mx-auto opacity-50" strokeWidth={1.5} />
+						<h2 className="text-h2 text-primary">
+							No matches found
 						</h2>
-						<p className="text-gray-600">
+						<p className="text-muted">
 							Try adjusting your preferences or adding more details.
 						</p>
 						<Button
 							onClick={handleStartOver}
-							className="bg-accent hover:bg-accent-dark text-white"
+							className="bg-primary hover:bg-primary/90 text-cream font-bold btn-hover-lift"
 						>
 							Start Over
 						</Button>
@@ -193,16 +200,22 @@ export default function RecommendationsPage() {
 			<Header />
 
 			<main className="flex-1 px-4 py-12">
-				<div className="max-w-7xl mx-auto space-y-8">
+				<div className="max-w-7xl mx-auto space-y-10">
 					{/* Page Header */}
-					<div className="text-center space-y-3">
-						<h1 className="text-h1 text-primary font-heading">
-							Your Personalized Recommendations
+					<div className="text-center space-y-4 opacity-0 animate-fade-in-up">
+						<BookOpen className="w-12 h-12 text-accent mx-auto opacity-80" strokeWidth={1.5} />
+						<h1 className="text-hero text-primary font-heading">
+							Your Personal Library
 						</h1>
-						<p className="text-lg text-gray-600">
-							Based on your preferences
-							{session.csv_uploaded && " and reading history"}
+						<p className="text-xl text-muted font-light max-w-2xl mx-auto">
+							Three exceptional books selected just for you
+							{session.csv_uploaded && ", based on your unique reading history"}
 						</p>
+						<div className="flex items-center justify-center gap-3">
+							<div className="h-px w-16 bg-primary/20" />
+							<BookOpen className="w-5 h-5 text-accent/60" strokeWidth={1.5} />
+							<div className="h-px w-16 bg-primary/20" />
+						</div>
 					</div>
 
 					{/* Recommendations Grid - Podium Layout */}
@@ -211,32 +224,33 @@ export default function RecommendationsPage() {
 							const isCenter = rec.rank === 1;
 							const userFeedback = feedback[rec.id];
 							const showSuccess = feedbackSuccess === rec.id;
+							const animationDelay = index === 0 ? "delay-200" : index === 1 ? "delay-300" : "delay-400";
 
 							return (
 								<Card
 									key={rec.id}
-									className={`relative p-6 space-y-4 transition-all duration-300 card-hover ${
+									className={`relative paper-card p-0 overflow-hidden card-hover opacity-0 animate-fade-in-up ${animationDelay} ${
 										isCenter
-											? "md:scale-105 md:shadow-xl border-2 border-secondary/40"
-											: "border border-gray-200"
+											? "md:scale-105 border-2 border-accent/40 shadow-xl"
+											: "border border-primary/10"
 									}`}
 								>
 									{/* Rank Badge */}
 									<div
-										className={`absolute top-4 left-4 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shadow-lg ${
+										className={`absolute top-4 left-4 w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl shadow-xl z-10 ${
 											rec.rank === 1
-												? "bg-accent text-white"
+												? "bg-accent text-primary ring-2 ring-accent/20"
 												: rec.rank === 2
-												? "bg-gray-400 text-white"
-												: "bg-orange-400 text-white"
+												? "bg-secondary text-cream ring-2 ring-secondary/20"
+												: "bg-primary/80 text-cream ring-2 ring-primary/20"
 										}`}
 									>
-										#{rec.rank}
+										{rec.rank}
 									</div>
 
 									{/* Confidence Badge */}
 									<Badge
-										className={`absolute top-4 right-4 ${getConfidenceColor(
+										className={`absolute top-4 right-4 font-semibold z-10 shadow-md ${getConfidenceColor(
 											rec.confidence_score,
 										)}`}
 									>
@@ -244,52 +258,58 @@ export default function RecommendationsPage() {
 									</Badge>
 
 									{/* Book Cover */}
-									<div className="flex justify-center pt-4">
+									<div className="flex justify-center pt-8 pb-4">
 										{rec.book.cover_url ? (
 											<img
 												src={rec.book.cover_url}
 												alt={`${rec.book.title} cover`}
-												className="h-48 w-auto object-contain rounded shadow-md"
+												className="h-56 w-auto object-contain rounded-sm shadow-lg transition-transform hover:scale-105 duration-300"
 											/>
 										) : (
-											<div className="h-48 w-32 bg-gray-200 rounded flex items-center justify-center">
-												<BookOpen className="w-12 h-12 text-gray-400" />
+											<div className="h-56 w-36 bg-gradient-to-br from-cream-dark to-primary/10 rounded-sm flex flex-col items-center justify-center border border-primary/20 shadow-md">
+												<BookOpen className="w-16 h-16 text-primary/30 mb-2" strokeWidth={1.5} />
+												<p className="text-xs text-muted text-center px-2 italic">Cover unavailable</p>
 											</div>
 										)}
 									</div>
 
 									{/* Book Information */}
-									<div className="space-y-2">
+									<div className="space-y-3 px-6 pb-4">
 										<a
 											href={getAmazonLink(rec.book.isbn)}
 											target="_blank"
 											rel="noopener noreferrer"
-											className="text-xl font-bold text-gray-900 hover:text-secondary hover:underline transition-colors flex items-center gap-1"
+											className="group block"
 										>
-											{rec.book.title}
-											<ExternalLink className="w-4 h-4" />
+											<h3 className="text-xl font-bold text-primary group-hover:text-secondary transition-colors font-heading leading-tight line-clamp-2 mb-1">
+												{rec.book.title}
+											</h3>
+											<span className="text-xs text-secondary group-hover:underline inline-flex items-center gap-1">
+												View on Amazon
+												<ExternalLink className="w-3 h-3" />
+											</span>
 										</a>
 
-										<p className="text-gray-700 font-medium">
-											{rec.book.author}
+										<p className="text-text font-medium text-base">
+											by {rec.book.author}
 										</p>
 
 										{rec.book.publication_year && (
-											<p className="text-sm text-gray-500">
+											<p className="text-xs text-muted italic">
 												{rec.book.publication_year}
 											</p>
 										)}
 
 										{rec.book.categories &&
 											rec.book.categories.length > 0 && (
-												<div className="flex flex-wrap gap-2 pt-2">
+												<div className="flex flex-wrap gap-2 pt-1">
 													{rec.book.categories
 														.slice(0, 3)
 														.map((category) => (
 															<Badge
 																key={category}
 																variant="secondary"
-																className="text-xs text-white"
+																className="text-xs bg-secondary/10 text-secondary border border-secondary/20 font-medium"
 															>
 																{category}
 															</Badge>
@@ -299,17 +319,17 @@ export default function RecommendationsPage() {
 									</div>
 
 									{/* Explanation */}
-									<div className="bg-gray-50 rounded-component p-4 space-y-2">
-										<p className="text-sm font-semibold text-gray-700">
-											Why we recommend this
+									<div className="mx-6 mb-4 bg-cream-dark/50 rounded-component p-4 space-y-2 border border-primary/10">
+										<p className="text-xs font-bold text-primary uppercase tracking-wider">
+											Why We Recommend This
 										</p>
-										<p className="text-sm text-gray-600">
+										<p className="text-sm text-text leading-relaxed line-clamp-4">
 											{rec.explanation}
 										</p>
 									</div>
 
 									{/* Feedback Buttons */}
-									<div className="flex items-center gap-3 pt-2">
+									<div className="flex items-center gap-3 px-6 pb-6 pt-2">
 										<Button
 											onClick={() => handleFeedback(rec.id, "like")}
 											disabled={userFeedback !== undefined}
@@ -319,10 +339,10 @@ export default function RecommendationsPage() {
 													: "outline"
 											}
 											size="sm"
-											className={`flex-1 ${
+											className={`flex-1 transition-all font-semibold ${
 												userFeedback === "like"
-													? "bg-green-600 hover:bg-green-700 text-white"
-													: ""
+													? "bg-success hover:bg-success/90 text-cream border-success shadow-md"
+													: "border-primary/30 text-primary hover:bg-primary/5"
 											}`}
 										>
 											<ThumbsUp
@@ -332,7 +352,7 @@ export default function RecommendationsPage() {
 														: ""
 												}`}
 											/>
-											Like
+											Perfect Match
 										</Button>
 
 										<Button
@@ -344,10 +364,10 @@ export default function RecommendationsPage() {
 													: "outline"
 											}
 											size="sm"
-											className={`flex-1 ${
+											className={`flex-1 transition-all font-semibold ${
 												userFeedback === "dislike"
-													? "bg-red-600 hover:bg-red-700 text-white"
-													: ""
+													? "bg-error hover:bg-error/90 text-cream border-error shadow-md"
+													: "border-primary/30 text-primary hover:bg-primary/5"
 											}`}
 										>
 											<ThumbsDown
@@ -357,14 +377,15 @@ export default function RecommendationsPage() {
 														: ""
 												}`}
 											/>
-											Dislike
+											Not For Me
 										</Button>
 									</div>
 
 									{/* Success Message */}
 									{showSuccess && (
-										<div className="absolute bottom-4 left-4 right-4 bg-green-100 border border-green-200 rounded px-2 py-2 text-sm text-green-800 text-center animate-in fade-in slide-in-from-bottom-2">
-											Thanks for your feedback!
+										<div className="mx-6 mb-4 bg-success/10 backdrop-blur-sm border border-success/30 rounded-component px-4 py-2.5 text-sm text-success text-center font-semibold animate-in fade-in slide-in-from-bottom-2 flex items-center justify-center gap-2">
+											<CheckCircle className="w-4 h-4" />
+											Thank you for your feedback!
 										</div>
 									)}
 								</Card>
@@ -373,16 +394,16 @@ export default function RecommendationsPage() {
 					</div>
 
 					{/* Bottom Section */}
-					<div className="text-center space-y-4 pt-8">
-						<p className="text-gray-600">
-							Want more recommendations? Start a new search
+					<div className="text-center space-y-6 pt-10 opacity-0 animate-fade-in delay-500">
+						<p className="text-lg text-muted font-light">
+							Ready to explore more?
 						</p>
 						<Button
 							onClick={handleStartOver}
 							variant="outline"
-							className="hover:bg-secondary hover:text-white border-secondary/50 hover:border-secondary"
+							className="hover:bg-secondary hover:text-cream border-secondary/50 hover:border-secondary text-secondary font-semibold btn-hover-lift"
 						>
-							New Search
+							Start a New Search
 						</Button>
 					</div>
 				</div>

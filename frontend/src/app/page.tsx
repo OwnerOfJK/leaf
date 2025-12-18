@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, BookOpen, Shield } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
 import { apiClient } from "@/lib/api-client";
-import Image from "next/image";
 
 export default function Home() {
 	const router = useRouter();
@@ -220,39 +219,31 @@ export default function Home() {
 			<main className="flex-1 flex items-center justify-center px-4 py-8 md:py-12">
 				<div className="max-w-4xl w-full space-y-10">
 					{/* Hero Section */}
-					<div className="text-center space-y-3">
-						<div className="flex justify-center mb-4">
-							<Image
-								src="/svgs/undraw_chat-text.svg"
-								alt="Chat illustration"
-								width={40}
-								height={40}
-								className="opacity-90"
-							/>
+					<div className="text-center space-y-4 opacity-0 animate-fade-in-up">
+						<div className="flex justify-center mb-3">
+							<BookOpen className="w-16 h-16 text-accent opacity-80" strokeWidth={1.5} />
 						</div>
 						<h1 className="text-hero text-primary font-heading">
-							Find your next favorite book
+							Discover Your Next
+							<span className="block mt-1 text-accent italic">Great Read</span>
 						</h1>
-						<p className="text-lg text-gray-600 max-w-2xl mx-auto">
-							Tell us what you're looking for and get AI-powered recommendations
+						<p className="text-xl text-muted max-w-2xl mx-auto font-light">
+							Personalized book recommendations powered by your taste
 						</p>
 					</div>
 
 					{/* Main Input Section - The Focal Point */}
-					<div className="relative bg-white border-2 border-secondary/30 rounded-card shadow-lg p-8 md:p-10 space-y-6 hover:border-secondary/50 transition-colors overflow-hidden">
-						{/* Decorative Coffee Background */}
-						<div className="absolute -bottom-6 -right-6 opacity-5 pointer-events-none">
-							<Image
-								src="/svgs/undraw_coffee.svg"
-								alt=""
-								width={150}
-								height={150}
-							/>
+					<div className="relative paper-card rounded-card p-8 md:p-10 space-y-6 overflow-hidden opacity-0 animate-fade-in-up delay-200">
+						{/* Decorative corner flourish */}
+						<div className="absolute top-0 right-0 w-32 h-32 opacity-5 pointer-events-none">
+							<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+								<path d="M0 0 Q50 0 50 50 Q50 0 100 0 L100 100 L0 100 Z" fill="currentColor" className="text-primary"/>
+							</svg>
 						</div>
 
 						<label
 							htmlFor="query"
-							className="block text-2xl md:text-3xl font-bold text-gray-900 text-center relative z-10"
+							className="block text-h2 text-primary text-center relative z-10"
 						>
 							What kind of book are you looking for?
 						</label>
@@ -261,8 +252,8 @@ export default function Home() {
 							id="query"
 							value={query}
 							onChange={(e) => setQuery(e.target.value)}
-							placeholder="I want something like Project Hail Mary but with more character development..."
-							className="relative z-10 min-h-[160px] text-lg resize-none border-2 border-gray-300 focus:border-secondary focus:ring-2 focus:ring-secondary/20"
+							placeholder="I'm looking for a character-driven novel with complex relationships, similar to The Remains of the Day but set in a contemporary setting..."
+							className="relative z-10 min-h-[160px] text-lg resize-none border border-primary/20 focus:border-primary focus:ring-2 focus:ring-accent/20 rounded-component bg-white/50 backdrop-blur-sm"
 							disabled={isSubmitting}
 						/>
 						
@@ -280,27 +271,30 @@ export default function Home() {
 						</div>
 
 						{/* CTA Button */}
-						<div className="flex justify-center pt-2">
+						<div className="flex justify-center pt-4">
 							<Button
 								onClick={handleSubmit}
 								disabled={!canSubmit}
 								size="lg"
-								className="bg-accent hover:bg-accent-dark text-white font-bold px-12 py-7 text-xl rounded-component btn-hover-lift disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+								className="bg-primary hover:bg-primary/90 text-cream font-bold px-12 py-7 text-xl rounded-component btn-hover-lift disabled:opacity-50 disabled:cursor-not-allowed shadow-lg relative overflow-hidden group"
 							>
-								{isSubmitting ? "Processing..." : "Get My Recommendations"}
+								<span className="relative z-10">
+									{isSubmitting ? "Processing..." : "Find My Next Book"}
+								</span>
+								<div className="absolute inset-0 bg-accent opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
 							</Button>
 						</div>
 
 						{/* Error Message */}
 						{generalError && (
-							<div className="bg-red-50 border-2 border-error rounded-component p-4 text-center">
+							<div className="bg-error/5 border border-error/30 rounded-component p-4 text-center backdrop-blur-sm">
 								<p className="text-error font-medium">{generalError}</p>
 							</div>
 						)}
 					</div>
 
 					{/* Trust Indicators */}
-					<div className="pt-4 flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-gray-600">
+					<div className="pt-4 flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-muted opacity-0 animate-fade-in delay-400">
 						<div className="flex items-center gap-2">
 							<CheckCircle2 className="w-4 h-4 text-secondary" />
 							<span>Open source</span>
@@ -311,7 +305,7 @@ export default function Home() {
 						</div>
 						<div className="flex items-center gap-2">
 							<BookOpen className="w-4 h-4 text-secondary" />
-							<span>No user data stored</span>
+							<span>No data stored</span>
 						</div>
 					</div>
 				</div>

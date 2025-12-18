@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, CheckCircle, XCircle, X, FileText } from "lucide-react";
+import { Upload, CheckCircle, XCircle, X, FileText, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import Image from "next/image";
 
 interface CSVUploadProps {
 	onFileSelect: (file: File) => void;
@@ -79,14 +78,14 @@ export function CSVUpload({
 	if (uploadStatus === "success" || alreadyUploaded) {
 		return (
 			<div className="w-full">
-				<div className="border-2 border-success rounded-component p-6 bg-green-50 flex items-center justify-between">
+				<div className="border border-success/30 rounded-component p-5 bg-success/5 backdrop-blur-sm flex items-center justify-between">
 					<div className="flex items-center gap-3">
-						<CheckCircle className="w-6 h-6 text-success" />
+						<CheckCircle className="w-6 h-6 text-success" strokeWidth={2} />
 						<div>
-							<p className="font-medium text-gray-900">
+							<p className="font-semibold text-primary">
 								{fileName || "Goodreads library uploaded"}
 							</p>
-							<p className="text-sm text-gray-600">
+							<p className="text-sm text-muted">
 								Your reading history is ready
 							</p>
 						</div>
@@ -95,10 +94,10 @@ export function CSVUpload({
 						onClick={onClearFile}
 						variant="ghost"
 						size="sm"
-						className="text-gray-600 hover:text-error"
+						className="text-muted hover:text-error hover:bg-error/5"
 					>
 						<X className="w-4 h-4 mr-1" />
-						Clear CSV
+						Remove
 					</Button>
 				</div>
 			</div>
@@ -109,19 +108,19 @@ export function CSVUpload({
 	if (uploadStatus === "uploading") {
 		return (
 			<div className="w-full">
-				<div className="border-2 border-secondary rounded-component p-6 bg-icy-blue-light">
+				<div className="border border-secondary/30 rounded-component p-5 bg-secondary/5 backdrop-blur-sm">
 					<div className="flex items-center gap-3 mb-3">
-						<FileText className="w-6 h-6 text-secondary animate-pulse" />
+						<Library className="w-6 h-6 text-secondary animate-pulse" strokeWidth={2} />
 						<div className="flex-1">
-							<p className="font-medium text-gray-900">{fileName}</p>
-							<p className="text-sm text-gray-600">
-								Processing your library...
+							<p className="font-semibold text-primary">{fileName}</p>
+							<p className="text-sm text-muted">
+								Building your reading profile...
 							</p>
 						</div>
 					</div>
-					<Progress value={uploadProgress} className="h-2" />
-					<p className="text-xs text-gray-600 mt-2 text-right">
-						{uploadProgress}%
+					<Progress value={uploadProgress} className="h-2 bg-cream-dark" />
+					<p className="text-xs text-muted mt-2 text-right font-medium">
+						{uploadProgress}% complete
 					</p>
 				</div>
 			</div>
@@ -132,14 +131,14 @@ export function CSVUpload({
 	if (uploadStatus === "error") {
 		return (
 			<div className="w-full">
-				<div className="border-2 border-error rounded-component p-6 bg-red-50 flex items-center justify-between">
+				<div className="border border-error/30 rounded-component p-5 bg-error/5 backdrop-blur-sm flex items-center justify-between">
 					<div className="flex items-center gap-3">
-						<XCircle className="w-6 h-6 text-error" />
+						<XCircle className="w-6 h-6 text-error" strokeWidth={2} />
 						<div>
-							<p className="font-medium text-gray-900">Upload failed</p>
+							<p className="font-semibold text-primary">Upload failed</p>
 							<p className="text-sm text-error">
 								{errorMessage ||
-									"We couldn't read this file. Make sure it's exported from Goodreads."}
+									"Please ensure you're using a valid Goodreads export file."}
 							</p>
 						</div>
 					</div>
@@ -147,9 +146,9 @@ export function CSVUpload({
 						onClick={handleClick}
 						variant="outline"
 						size="sm"
-						className="border-error text-error hover:bg-error hover:text-white"
+						className="border-error/30 text-error hover:bg-error hover:text-cream font-semibold"
 					>
-						Try Again
+						Retry
 					</Button>
 				</div>
 			</div>
@@ -167,41 +166,38 @@ export function CSVUpload({
 				onClick={handleClick}
 				className={`
           border-2 border-dashed rounded-component p-8
-          cursor-pointer transition-all duration-200
+          cursor-pointer transition-all duration-300
           ${
 						dragActive
-							? "border-secondary bg-icy-blue-light scale-[1.02]"
-							: "border-gray-300 hover:border-secondary hover:bg-icy-blue-light/50"
+							? "border-secondary bg-secondary/10 scale-[1.01] shadow-md"
+							: "border-primary/20 hover:border-secondary hover:bg-secondary/5"
 					}
         `}
 			>
 				<div className="flex flex-col items-center text-center gap-4">
-					<Image
-						src="/svgs/undraw_cloud-upload.svg"
-						alt="Upload illustration"
-						width={20}
-						height={20}
-						className="opacity-90"
-					/>
+					<div className="relative">
+						<Library className="w-12 h-12 text-accent opacity-70" strokeWidth={1.5} />
+						<Upload className="w-5 h-5 text-secondary absolute -bottom-1 -right-1" strokeWidth={2.5} />
+					</div>
 
 					<div className="flex items-center gap-2 flex-wrap justify-center">
-						<p className="text-lg font-semibold text-gray-900">
-							Upload your Goodreads library
+						<p className="text-lg font-bold text-primary">
+							Upload Your Goodreads Library
 						</p>
 						<a
 							href="https://www.goodreads.com/review/import"
 							target="_blank"
 							rel="noopener noreferrer"
 							onClick={(e) => e.stopPropagation()}
-							className="text-sm text-secondary hover:underline"
+							className="text-sm text-secondary hover:underline font-medium"
 						>
-							(How To)
+							(Export Guide)
 						</a>
 					</div>
 
-					<p className="text-xs text-gray-500 max-w-md">
-						Your reading history helps us understand your taste (optional but
-						recommended)
+					<p className="text-sm text-muted max-w-md font-light">
+						Help us personalize your recommendations by sharing your reading history
+						<span className="block mt-1 text-xs italic">(Optional, but highly recommended)</span>
 					</p>
 				</div>
 
