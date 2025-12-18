@@ -1,32 +1,35 @@
-import { NextRequest } from 'next/server';
+import type { NextRequest } from "next/server";
 
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000';
+const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || "http://backend:8000";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ recommendationId: string }> }
+  { params }: { params: Promise<{ recommendationId: string }> },
 ) {
   try {
     const { recommendationId } = await params;
     const body = await request.text();
 
-    const response = await fetch(`${BACKEND_URL}/api/recommendations/${recommendationId}/feedback`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
+    const response = await fetch(
+      `${BACKEND_URL}/api/recommendations/${recommendationId}/feedback`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      },
+    );
 
     const data = await response.json();
 
     return new Response(JSON.stringify(data), {
       status: response.status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error('Proxy error:', error);
-    return new Response(
-      JSON.stringify({ detail: 'Internal proxy error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    console.error("Proxy error:", error);
+    return new Response(JSON.stringify({ detail: "Internal proxy error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
