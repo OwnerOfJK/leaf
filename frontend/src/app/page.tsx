@@ -235,21 +235,6 @@ export default function Home() {
 
           {/* Main Input Section - The Focal Point */}
           <div className="relative paper-card rounded-card p-8 md:p-10 space-y-6 overflow-hidden opacity-0 animate-fade-in-up delay-200">
-            {/* Decorative corner flourish */}
-            <div className="absolute top-0 right-0 w-32 h-32 opacity-5 pointer-events-none">
-              <svg
-                viewBox="0 0 100 100"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M0 0 Q50 0 50 50 Q50 0 100 0 L100 100 L0 100 Z"
-                  fill="currentColor"
-                  className="text-primary"
-                />
-              </svg>
-            </div>
-
             <label
               htmlFor="query"
               className="block text-h2 text-primary text-center relative z-10"
