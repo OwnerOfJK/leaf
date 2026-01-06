@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Leaf** is a conversational book recommendation system that provides personalized book suggestions by analyzing user preferences through natural language and Goodreads reading history.
 
-- **Frontend:** Next.js 16 (App Router) + TypeScript + Tailwind CSS + Biome
+- **Frontend:** Next.js 16.0.7 (App Router) + TypeScript + Tailwind CSS 4 + Biome
 - **Backend:** FastAPI + Python 3.13
-- **Infrastructure:** PostgreSQL + pgvector, Redis, Celery, Langfuse
+- **Infrastructure:** PostgreSQL 16 + pgvector, Redis 7, Celery, Langfuse
 - **AI:** OpenAI (embeddings + LLM), RAG pipeline with vector search
 
 ## Development Commands
@@ -38,6 +38,15 @@ uvicorn main:app --reload --host 0.0.0.0    # Expose on all interfaces
 ```bash
 alembic upgrade head                        # Run migrations
 alembic revision --autogenerate -m "msg"    # Generate migration
+```
+
+**Testing:**
+```bash
+pytest                           # Run all tests
+pytest -m unit                   # Run only unit tests
+pytest -m integration            # Run integration tests (requires services)
+pytest -v tests/test_services.py # Run specific test file
+pytest --cov=app                 # Run with coverage report
 ```
 
 **Celery worker (CSV processing):**
@@ -264,20 +273,20 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ## Technology Stack
 
 **Frontend:**
-- Next.js 16 (App Router), TypeScript, React 19
-- Tailwind CSS 4, shadcn/ui components
-- Biome (linter + formatter, replaces ESLint + Prettier)
+- Next.js 16.0.7 (App Router), TypeScript, React 19.2.0
+- Tailwind CSS 4, shadcn/ui components (Radix UI primitives)
+- Biome 2.2.0 (linter + formatter, replaces ESLint + Prettier)
 
 **Backend:**
-- FastAPI, Python 3.13, SQLAlchemy, Pydantic
-- pgvector for vector search
-- Redis for sessions + Celery broker
+- FastAPI 0.124.0, Python 3.13, SQLAlchemy 2.0.36, Pydantic 2.10.5
+- pgvector 0.3.6 for vector search
+- Redis 5.2.1 for sessions + Celery 5.4.0 broker
 - Celery for async CSV processing
 
 **AI/ML:**
-- OpenAI text-embedding-3-small (embeddings)
-- OpenAI gpt-4o-mini (LLM generation)
-- Langfuse for observability + feedback
+- OpenAI 1.59.5: text-embedding-3-small (embeddings)
+- OpenAI: gpt-4o-mini (LLM generation)
+- Langfuse 2.59.1 for observability + feedback
 
 ## Pre-Implementation Assumptions
 
@@ -304,15 +313,25 @@ The product specification (PRODUCT.md) assumes:
 - `docker-compose.yml` - Infrastructure setup
 - `backend/main.py` - FastAPI application entry point
 - `frontend/package.json` - Frontend dependencies and scripts
-- `backend/app/services/recommendation_engine.py` - Core RAG pipeline (to be implemented)
-- `backend/app/workers/tasks.py` - CSV processing worker (to be implemented)
+- `backend/app/services/recommendation_engine.py` - Core RAG pipeline implementation
+- `backend/app/workers/tasks.py` - CSV processing worker implementation
+- `backend/pyproject.toml` - Pytest configuration with test markers
 
 ## Current State
 
-This is a greenfield project. Core infrastructure is set up:
-- Frontend: Basic Next.js app with TypeScript + Tailwind
-- Backend: Minimal FastAPI app with example endpoints
-- Database/Redis: Configured in docker-compose.yml
-- Dependencies: Installed and ready
+Core implementation is in progress:
+- ✅ Frontend: Next.js 16.0.7 with TypeScript, Tailwind CSS 4, Biome, React 19.2.0
+- ✅ Backend: FastAPI with all route handlers (sessions, recommendations, feedback)
+- ✅ Database: PostgreSQL 16 with pgvector, migrations configured via Alembic
+- ✅ Services: RAG pipeline, vector search, Google Books integration, CSV processing
+- ✅ Workers: Celery worker for async CSV processing
+- ✅ Infrastructure: Docker Compose with PostgreSQL 16 (pgvector) + Redis 7
 
-**Next implementation steps:** See section 16 in PRODUCT.md for detailed implementation roadmap.
+**Implementation status:**
+- Database schema and migrations are complete
+- API endpoints are functional
+- RAG pipeline with Langfuse tracing is implemented
+- CSV processing worker is operational
+- Frontend pages (input, questions, recommendations) are built
+
+Refer to PRODUCT.md for complete specification and implementation roadmap.
