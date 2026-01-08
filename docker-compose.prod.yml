@@ -16,6 +16,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 3g
+    mem_reservation: 2g
+    shm_size: 256mb
 
   redis:
     image: redis:7-alpine
@@ -31,6 +34,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 768m
+    mem_reservation: 512m
 
   backend:
     build:
@@ -56,6 +61,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    mem_limit: 1g
+    mem_reservation: 512m
 
   celery-worker:
     build:
@@ -75,6 +82,8 @@ services:
       - csv_uploads:/tmp/leaf_csv_uploads
     networks:
       - leaf-network
+    mem_limit: 512m
+    mem_reservation: 256m
 
   frontend:
     build:
@@ -95,6 +104,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    mem_limit: 512m
+    mem_reservation: 256m
 
 networks:
   leaf-network:
