@@ -66,8 +66,6 @@ services:
         condition: service_healthy
     volumes:
       - csv_uploads:/tmp/leaf_csv_uploads
-    # Port 8000 NOT exposed - backend is internal only
-    # Accessible to frontend via http://backend:8000 (Docker network)
     networks:
       - leaf-network
     healthcheck:
@@ -115,11 +113,23 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
-    container_name: leaf-celery
+    container_name: leaf-celery-2
     restart: unless-stopped
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
-    env_file:
-      - ./backend/.env.prod
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 --hostname=worker2@%h
+    environment:
+      DATABASE_URL: ${{project.DATABASE_URL}}
+      REDIS_URL: ${{project.REDIS_URL}}
+      REDIS_SESSION_TTL: ${{project.REDIS_SESSION_TTL}}
+      OPENAI_API_KEY: ${{project.OPENAI_API_KEY}}
+      LANGFUSE_PUBLIC_KEY: ${{project.LANGFUSE_PUBLIC_KEY}}
+      LANGFUSE_SECRET_KEY: ${{project.LANGFUSE_SECRET_KEY}}
+      LANGFUSE_BASE_URL: ${{project.LANGFUSE_BASE_URL}}
+      GOOGLE_BOOKS_API_KEY: ${{project.GOOGLE_BOOKS_API_KEY}}
+      NYT_BOOKS_API_KEY: ${{project.NYT_BOOKS_API_KEY}}
+      CELERY_BROKER_URL: ${{project.CELERY_BROKER_URL}}
+      CELERY_RESULT_BACKEND: ${{project.CELERY_RESULT_BACKEND}}
+      ENVIRONMENT: ${{project.ENVIRONMENT}}
+      DEBUG: ${{project.DEBUG}}
     depends_on:
       postgres:
         condition: service_healthy
