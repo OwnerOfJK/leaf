@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${BACKEND_URL}/api/sessions/create`, {
       method: "POST",
       body: formData,
+      signal: AbortSignal.timeout(30000),
     });
 
     const data = await response.json();

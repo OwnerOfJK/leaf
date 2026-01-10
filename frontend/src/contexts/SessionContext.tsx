@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { sessionStorage } from "@/lib/session-storage";
 import type { CSVStatus, SessionState } from "@/types/api";
@@ -47,10 +47,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<SessionState>(defaultState);
 
   // Helper function to clear session (defined early for use in useEffect)
-  const clearSession = () => {
+  const clearSession = useCallback(() => {
     setState(defaultState);
     sessionStorage.clearAll();
-  };
+  }, []);
 
   // Load session from localStorage on mount (with automatic expiration check)
   useEffect(() => {
@@ -88,31 +88,31 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state]);
 
-  const setSessionId = (id: string) => {
+  const setSessionId = useCallback((id: string) => {
     setState((prev) => ({ ...prev, session_id: id }));
-  };
+  }, []);
 
-  const setExpiresAt = (expiresAt: number) => {
+  const setExpiresAt = useCallback((expiresAt: number) => {
     setState((prev) => ({ ...prev, expires_at: expiresAt }));
-  };
+  }, []);
 
-  const setInitialQuery = (query: string) => {
+  const setInitialQuery = useCallback((query: string) => {
     setState((prev) => ({ ...prev, initial_query: query }));
-  };
+  }, []);
 
-  const setCsvUploaded = (uploaded: boolean) => {
+  const setCsvUploaded = useCallback((uploaded: boolean) => {
     setState((prev) => ({ ...prev, csv_uploaded: uploaded }));
-  };
+  }, []);
 
-  const setCsvStatus = (status: CSVStatus) => {
+  const setCsvStatus = useCallback((status: CSVStatus) => {
     setState((prev) => ({ ...prev, csv_status: status }));
-  };
+  }, []);
 
-  const setCurrentStep = (step: SessionState["current_step"]) => {
+  const setCurrentStep = useCallback((step: SessionState["current_step"]) => {
     setState((prev) => ({ ...prev, current_step: step }));
-  };
+  }, []);
 
-  const setAnswer = async (questionNum: 1 | 2 | 3, answer: string | null) => {
+  const setAnswer = useCallback(async (questionNum: 1 | 2 | 3, answer: string | null) => {
     // Update local state first (optimistic update)
     setState((prev) => ({
       ...prev,
@@ -137,9 +137,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         // Backend will get answers on next sync or final submit
       }
     }
-  };
+  }, [state.session_id, state.answers]);
 
-  const setQuestion = (questionNum: 1 | 2 | 3, question: string | null) => {
+  const setQuestion = useCallback((questionNum: 1 | 2 | 3, question: string | null) => {
     setState((prev) => ({
       ...prev,
       questions: {
@@ -147,9 +147,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         [`question_${questionNum}`]: question,
       },
     }));
-  };
+  }, []);
 
-  const resetSession = async () => {
+  const resetSession = useCallback(async () => {
     // Reset both frontend state and backend Redis session
     const currentSessionId = state.session_id;
 
@@ -178,15 +178,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         // Continue anyway - frontend is reset
       }
     }
-  };
+  }, [state.session_id]);
 
-  const clearCsvData = () => {
+  const clearCsvData = useCallback(() => {
     setState((prev) => ({
       ...prev,
       csv_uploaded: false,
       csv_status: "none",
     }));
-  };
+  }, []);
 
   const value: SessionContextValue = {
     ...state,

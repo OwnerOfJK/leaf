@@ -2,7 +2,7 @@
 
 import { BookOpen, CheckCircle2, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/contexts/SessionContext";
@@ -32,7 +32,7 @@ export default function Home() {
     }
   }, [session.initial_query]);
 
-  const pollCsvStatus = async (sessionId: string) => {
+  const pollCsvStatus = useCallback(async (sessionId: string) => {
 		const maxAttempts = 120; // 2 minutes max (120 * 1 second)
 		let attempts = 0;
  
@@ -85,7 +85,7 @@ export default function Home() {
 				);
 			}
 		}, 1000); // Poll every second
-	};
+	}, [session.setCsvStatus, session.setCsvUploaded]);
 
   // Check if user has existing session with CSV data and resume polling if needed
   useEffect(() => {
@@ -247,7 +247,7 @@ export default function Home() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="I'm looking for a character-driven novel with complex relationships, similar to The Remains of the Day but set in a contemporary setting..."
-              className="relative z-10 min-h-[160px] text-lg resize-none border border-primary/20 focus:border-primary focus:ring-2 focus:ring-accent/20 rounded-component bg-white/50 backdrop-blur-sm"
+              className="relative z-10 min-h-40 text-lg resize-none border border-primary/20 focus:border-primary focus:ring-2 focus:ring-accent/20 rounded-component bg-white/50 backdrop-blur-sm"
               disabled={isSubmitting}
             />
 
