@@ -188,7 +188,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const value: SessionContextValue = {
+  const value: SessionContextValue = useMemo(() => ({
     ...state,
     setSessionId,
     setExpiresAt,
@@ -201,7 +201,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     resetSession,
     clearCsvData,
     clearSession,
-  };
+  }), [
+    state,
+    setSessionId,
+    setExpiresAt,
+    setInitialQuery,
+    setCsvUploaded,
+    setCsvStatus,
+    setCurrentStep,
+    setAnswer,
+    setQuestion,
+    resetSession,
+    clearCsvData,
+    clearSession,
+  ]);
 
   return (
     <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
