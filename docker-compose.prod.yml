@@ -154,7 +154,7 @@ services:
     depends_on:
       - backend
     networks:
-      - leaf-
+      - leaf-network
       - dokploy-network
     labels:
       - "traefik.enable=true"
