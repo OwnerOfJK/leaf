@@ -4,15 +4,15 @@ services:
     container_name: leaf-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${{project.POSTGRES_USER}}
-      POSTGRES_PASSWORD: ${{project.POSTGRES_PASSWORD}}
-      POSTGRES_DB: ${{project.POSTGRES_DB}}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - leaf-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${{project.POSTGRES_USER}} -d ${{project.POSTGRES_DB}}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,21 +44,21 @@ services:
     container_name: leaf-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${{project.DATABASE_URL}}
-      REDIS_URL: ${{project.REDIS_URL}}
-      REDIS_SESSION_TTL: ${{project.REDIS_SESSION_TTL}}
-      OPENAI_API_KEY: ${{project.OPENAI_API_KEY}}
-      LANGFUSE_PUBLIC_KEY: ${{project.LANGFUSE_PUBLIC_KEY}}
-      LANGFUSE_SECRET_KEY: ${{project.LANGFUSE_SECRET_KEY}}
-      LANGFUSE_BASE_URL: ${{project.LANGFUSE_BASE_URL}}
-      GOOGLE_BOOKS_API_KEY: ${{project.GOOGLE_BOOKS_API_KEY}}
-      NYT_BOOKS_API_KEY: ${{project.NYT_BOOKS_API_KEY}}
-      CELERY_BROKER_URL: ${{project.CELERY_BROKER_URL}}
-      CELERY_RESULT_BACKEND: ${{project.CELERY_RESULT_BACKEND}}
-      GUNICORN_WORKERS: ${{project.GUNICORN_WORKERS}}
-      ENVIRONMENT: ${{project.ENVIRONMENT}}
-      DEBUG: ${{project.DEBUG}}
-      ALLOWED_ORIGINS: ${{project.ALLOWED_ORIGINS}}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      REDIS_SESSION_TTL: ${REDIS_SESSION_TTL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL}
+      GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY}
+      NYT_BOOKS_API_KEY: ${NYT_BOOKS_API_KEY}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS}
+      ENVIRONMENT: ${ENVIRONMENT}
+      DEBUG: ${DEBUG}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,19 +84,19 @@ services:
     restart: unless-stopped
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 --hostname=worker1@%h
     environment:
-      DATABASE_URL: ${{project.DATABASE_URL}}
-      REDIS_URL: ${{project.REDIS_URL}}
-      REDIS_SESSION_TTL: ${{project.REDIS_SESSION_TTL}}
-      OPENAI_API_KEY: ${{project.OPENAI_API_KEY}}
-      LANGFUSE_PUBLIC_KEY: ${{project.LANGFUSE_PUBLIC_KEY}}
-      LANGFUSE_SECRET_KEY: ${{project.LANGFUSE_SECRET_KEY}}
-      LANGFUSE_BASE_URL: ${{project.LANGFUSE_BASE_URL}}
-      GOOGLE_BOOKS_API_KEY: ${{project.GOOGLE_BOOKS_API_KEY}}
-      NYT_BOOKS_API_KEY: ${{project.NYT_BOOKS_API_KEY}}
-      CELERY_BROKER_URL: ${{project.CELERY_BROKER_URL}}
-      CELERY_RESULT_BACKEND: ${{project.CELERY_RESULT_BACKEND}}
-      ENVIRONMENT: ${{project.ENVIRONMENT}}
-      DEBUG: ${{project.DEBUG}}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      REDIS_SESSION_TTL: ${REDIS_SESSION_TTL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL}
+      GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY}
+      NYT_BOOKS_API_KEY: ${NYT_BOOKS_API_KEY}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+      ENVIRONMENT: ${ENVIRONMENT}
+      DEBUG: ${DEBUG}
     depends_on:
       postgres:
         condition: service_healthy
@@ -117,19 +117,19 @@ services:
     restart: unless-stopped
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 --hostname=worker2@%h
     environment:
-      DATABASE_URL: ${{project.DATABASE_URL}}
-      REDIS_URL: ${{project.REDIS_URL}}
-      REDIS_SESSION_TTL: ${{project.REDIS_SESSION_TTL}}
-      OPENAI_API_KEY: ${{project.OPENAI_API_KEY}}
-      LANGFUSE_PUBLIC_KEY: ${{project.LANGFUSE_PUBLIC_KEY}}
-      LANGFUSE_SECRET_KEY: ${{project.LANGFUSE_SECRET_KEY}}
-      LANGFUSE_BASE_URL: ${{project.LANGFUSE_BASE_URL}}
-      GOOGLE_BOOKS_API_KEY: ${{project.GOOGLE_BOOKS_API_KEY}}
-      NYT_BOOKS_API_KEY: ${{project.NYT_BOOKS_API_KEY}}
-      CELERY_BROKER_URL: ${{project.CELERY_BROKER_URL}}
-      CELERY_RESULT_BACKEND: ${{project.CELERY_RESULT_BACKEND}}
-      ENVIRONMENT: ${{project.ENVIRONMENT}}
-      DEBUG: ${{project.DEBUG}}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      REDIS_SESSION_TTL: ${REDIS_SESSION_TTL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL}
+      GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY}
+      NYT_BOOKS_API_KEY: ${NYT_BOOKS_API_KEY}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+      ENVIRONMENT: ${ENVIRONMENT}
+      DEBUG: ${DEBUG}
     depends_on:
       postgres:
         condition: service_healthy
@@ -149,8 +149,8 @@ services:
     container_name: leaf-frontend
     restart: unless-stopped
     environment:
-      BACKEND_INTERNAL_URL: ${{project.BACKEND_INTERNAL_URL}}
-      NEXT_PUBLIC_API_URL: ${{project.NEXT_PUBLIC_API_URL}}
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     depends_on:
       - backend
     ports:
