@@ -154,7 +154,18 @@ services:
     depends_on:
       - backend
     networks:
-      - leaf-network
+      - leaf-
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.leaf-frontend.rule=Host(`leaf-books.com`)"
+      - "traefik.http.routers.leaf-frontend.entrypoints=web"
+      - "traefik.http.routers.leaf-frontend.middlewares=redirect-to-https"
+      - "traefik.http.routers.leaf-frontend-secure.rule=Host(`leaf-books.com`)"
+      - "traefik.http.routers.leaf-frontend-secure.entrypoints=websecure"
+      - "traefik.http.routers.leaf-frontend-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.services.leaf-frontend.loadbalancer.server.port=3000"
+      - "traefik.docker.network=dokploy-network"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
@@ -166,6 +177,8 @@ services:
 networks:
   leaf-network:
     driver: bridge
+  dokploy-network:
+    external: true
 
 volumes:
   postgres_data:
