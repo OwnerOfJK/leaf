@@ -125,6 +125,15 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                     )
                     continue
 
+                # Skip books without any ISBN identifier (required for database)
+                if not google_data.get("isbn") and not google_data.get("isbn13"):
+                    books_failed += 1
+                    logger.warning(
+                        f"Skipping book (no ISBN in Google Books response): {google_data.get('title')} "
+                        f"by {google_data.get('author')}"
+                    )
+                    continue
+
                 # Truncate description to MAX_DESCRIPTION_LENGTH
                 description = google_data.get("description")
                 if description and len(description) > MAX_DESCRIPTION_LENGTH:
