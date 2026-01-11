@@ -113,26 +113,38 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                 google_data = None
                 if book_data["isbn"]:
                     google_data = fetch_from_google_books(book_data["isbn"])
-                if not google_data and book_data["isbn13"]:
+                # Retry with ISBN13 if first attempt failed or returned quota error
+                if (not google_data or google_data == "QUOTA_EXCEEDED") and book_data["isbn13"]:
                     google_data = fetch_from_google_books(book_data["isbn13"])
 
-                if not google_data:
+                if not google_data or google_data == "QUOTA_EXCEEDED":
                     # Could not fetch from Google Books - skip this book
                     books_failed += 1
+                    reason = "quota exceeded" if google_data == "QUOTA_EXCEEDED" else "not found in Google Books"
                     logger.warning(
-                        f"Skipping book (not found in Google Books): {book_data['title']} "
+                        f"Skipping book ({reason}): {book_data['title']} "
                         f"(ISBN: {book_data['isbn']}, ISBN13: {book_data['isbn13']})"
                     )
                     continue
 
-                # Skip books without any ISBN identifier (required for database)
-                if not google_data.get("isbn") and not google_data.get("isbn13"):
+                # Validate and normalize ISBN identifiers
+                # isbn13 is required for database, isbn (ISBN-10) is optional
+                google_isbn = google_data.get("isbn")
+                google_isbn13 = google_data.get("isbn13")
+
+                if not google_isbn and not google_isbn13:
+                    # No ISBN identifiers at all - skip this book
                     books_failed += 1
                     logger.warning(
                         f"Skipping book (no ISBN in Google Books response): {google_data.get('title')} "
                         f"by {google_data.get('author')}"
                     )
                     continue
+
+                # Ensure isbn13 is always set (required field)
+                if not google_isbn13 and google_isbn:
+                    google_data["isbn13"] = google_isbn
+                    logger.debug(f"Using ISBN-10 as ISBN-13 for: {google_data.get('title')}")
 
                 # Truncate description to MAX_DESCRIPTION_LENGTH
                 description = google_data.get("description")
@@ -224,6 +236,7 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
 
             except Exception as e:
                 logger.error(f"Error during batch embedding generation: {e}", exc_info=True)
+                db.rollback()  # Rollback failed transaction before continuing
                 books_failed += len(new_books_to_add)
                 # Continue with existing books only
 

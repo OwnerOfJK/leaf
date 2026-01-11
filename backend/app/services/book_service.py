@@ -1,13 +1,13 @@
 """Book service for CRUD operations."""
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.database import Book
 
 
 def get_book_by_isbn(db: Session, isbn: str) -> Book | None:
-    """Retrieve a book by its ISBN.
+    """Retrieve a book by its ISBN (checks both isbn and isbn13 fields).
 
     Args:
         db: Database session
@@ -16,7 +16,7 @@ def get_book_by_isbn(db: Session, isbn: str) -> Book | None:
     Returns:
         Book instance if found, None otherwise
     """
-    stmt = select(Book).where(Book.isbn == isbn)
+    stmt = select(Book).where(or_(Book.isbn13 == isbn, Book.isbn == isbn))
     return db.scalars(stmt).first()
 
 
@@ -50,14 +50,14 @@ def get_books_by_ids(db: Session, book_ids: list[int]) -> list[Book]:
 
 def create_book(
     db: Session,
-    isbn: str,
+    isbn13: str,
     title: str,
     author: str,
     embedding: list[float],
     description: str | None = None,
     categories: list[str] | None = None,
     cover_url: str | None = None,
-    isbn13: str | None = None,
+    isbn: str | None = None,
     page_count: int | None = None,
     publisher: str | None = None,
     publication_year: int | None = None,
@@ -70,14 +70,14 @@ def create_book(
 
     Args:
         db: Database session
-        isbn: Book ISBN-10 (must be unique)
+        isbn13: Book ISBN-13 (required, must be unique)
         title: Book title
         author: Book author
         embedding: 1536-dimensional embedding vector
         description: Book description (optional)
         categories: List of genre/category tags (optional)
         cover_url: URL to book cover image (optional)
-        isbn13: Book ISBN-13 (optional)
+        isbn: Book ISBN-10 (optional)
         page_count: Number of pages (optional)
         publisher: Publisher name (optional)
         publication_year: Year of publication (optional)
@@ -90,7 +90,7 @@ def create_book(
         Created Book instance
 
     Raises:
-        IntegrityError: If ISBN already exists
+        IntegrityError: If ISBN-13 already exists
     """
     book = Book(
         isbn=isbn,
