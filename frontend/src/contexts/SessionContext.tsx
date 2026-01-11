@@ -1,7 +1,14 @@
 "use client";
 
 import type React from "react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { apiClient } from "@/lib/api-client";
 import { sessionStorage } from "@/lib/session-storage";
 import type { CSVStatus, SessionState } from "@/types/api";
@@ -112,42 +119,48 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, current_step: step }));
   }, []);
 
-  const setAnswer = useCallback(async (questionNum: 1 | 2 | 3, answer: string | null) => {
-    // Update local state first (optimistic update)
-    setState((prev) => ({
-      ...prev,
-      answers: {
-        ...prev.answers,
-        [`question_${questionNum}`]: answer,
-      },
-    }));
+  const setAnswer = useCallback(
+    async (questionNum: 1 | 2 | 3, answer: string | null) => {
+      // Update local state first (optimistic update)
+      setState((prev) => ({
+        ...prev,
+        answers: {
+          ...prev.answers,
+          [`question_${questionNum}`]: answer,
+        },
+      }));
 
-    // Sync to backend Redis session
-    if (state.session_id) {
-      try {
-        await apiClient.submitAnswers(state.session_id, {
-          answers: {
-            ...state.answers,
-            [`question_${questionNum}`]: answer,
-          },
-        });
-      } catch (error) {
-        console.error("Failed to sync answer to backend:", error);
-        // Continue anyway - local state is updated
-        // Backend will get answers on next sync or final submit
+      // Sync to backend Redis session
+      if (state.session_id) {
+        try {
+          await apiClient.submitAnswers(state.session_id, {
+            answers: {
+              ...state.answers,
+              [`question_${questionNum}`]: answer,
+            },
+          });
+        } catch (error) {
+          console.error("Failed to sync answer to backend:", error);
+          // Continue anyway - local state is updated
+          // Backend will get answers on next sync or final submit
+        }
       }
-    }
-  }, [state.session_id, state.answers]);
+    },
+    [state.session_id, state.answers],
+  );
 
-  const setQuestion = useCallback((questionNum: 1 | 2 | 3, question: string | null) => {
-    setState((prev) => ({
-      ...prev,
-      questions: {
-        ...prev.questions,
-        [`question_${questionNum}`]: question,
-      },
-    }));
-  }, []);
+  const setQuestion = useCallback(
+    (questionNum: 1 | 2 | 3, question: string | null) => {
+      setState((prev) => ({
+        ...prev,
+        questions: {
+          ...prev.questions,
+          [`question_${questionNum}`]: question,
+        },
+      }));
+    },
+    [],
+  );
 
   const resetSession = useCallback(async () => {
     // Reset both frontend state and backend Redis session
@@ -188,33 +201,36 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const value: SessionContextValue = useMemo(() => ({
-    ...state,
-    setSessionId,
-    setExpiresAt,
-    setInitialQuery,
-    setCsvUploaded,
-    setCsvStatus,
-    setCurrentStep,
-    setAnswer,
-    setQuestion,
-    resetSession,
-    clearCsvData,
-    clearSession,
-  }), [
-    state,
-    setSessionId,
-    setExpiresAt,
-    setInitialQuery,
-    setCsvUploaded,
-    setCsvStatus,
-    setCurrentStep,
-    setAnswer,
-    setQuestion,
-    resetSession,
-    clearCsvData,
-    clearSession,
-  ]);
+  const value: SessionContextValue = useMemo(
+    () => ({
+      ...state,
+      setSessionId,
+      setExpiresAt,
+      setInitialQuery,
+      setCsvUploaded,
+      setCsvStatus,
+      setCurrentStep,
+      setAnswer,
+      setQuestion,
+      resetSession,
+      clearCsvData,
+      clearSession,
+    }),
+    [
+      state,
+      setSessionId,
+      setExpiresAt,
+      setInitialQuery,
+      setCsvUploaded,
+      setCsvStatus,
+      setCurrentStep,
+      setAnswer,
+      setQuestion,
+      resetSession,
+      clearCsvData,
+      clearSession,
+    ],
+  );
 
   return (
     <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

@@ -8,8 +8,9 @@ import {
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -37,7 +38,7 @@ export default function RecommendationsPage() {
   const hasLoadedRef = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
 
-  const loadRecommendations = async () => {
+  const loadRecommendations = useCallback(async () => {
     if (!session.session_id) return;
 
     setIsLoading(true);
@@ -55,7 +56,7 @@ export default function RecommendationsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session.session_id]);
 
   // Redirect if no session and load recommendations
   useEffect(() => {
@@ -277,10 +278,13 @@ export default function RecommendationsPage() {
                   {/* Book Cover */}
                   <div className="flex justify-center pt-8 pb-4">
                     {rec.book.cover_url ? (
-                      <img
+                      <Image
                         src={rec.book.cover_url}
                         alt={`${rec.book.title} cover`}
+                        width={150}
+                        height={224}
                         className="h-56 w-auto object-contain rounded-sm shadow-lg transition-transform hover:scale-105 duration-300"
+                        unoptimized
                       />
                     ) : (
                       <div className="h-56 w-36 bg-gradient-to-br from-cream-dark to-primary/10 rounded-sm flex flex-col items-center justify-center border border-primary/20 shadow-md">

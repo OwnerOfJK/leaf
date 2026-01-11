@@ -32,60 +32,63 @@ export default function Home() {
     }
   }, [session.initial_query]);
 
-  const pollCsvStatus = useCallback(async (sessionId: string) => {
-		const maxAttempts = 120; // 2 minutes max (120 * 1 second)
-		let attempts = 0;
- 
-		const poll = setInterval(async () => {
-			attempts++;
- 
-			try {
-				const status = await apiClient.getSessionStatus(sessionId);
- 
-				if (status.csv_status === "completed") {
-					clearInterval(poll);
-					setCsvUploadStatus("success");
-					session.setCsvStatus("completed");
-					session.setCsvUploaded(true);
- 
-					// Update progress to 100%
-					if (status.books_processed && status.books_total) {
-						setCsvProgress(
-							Math.round((status.books_processed / status.books_total) * 100),
-						);
-					}
-				} else if (status.csv_status === "failed") {
-					clearInterval(poll);
-					setCsvUploadStatus("error");
-					setCsvError("CSV processing failed. Please try again.");
-					session.setCsvStatus("failed");
-				} else if (status.csv_status === "processing") {
-					// Update progress
-					if (status.books_processed && status.books_total) {
-						setCsvProgress(
-							Math.round((status.books_processed / status.books_total) * 100),
-						);
-					}
-					session.setCsvStatus("processing");
-				}
- 
-				// Timeout after max attempts
-				if (attempts >= maxAttempts) {
-					clearInterval(poll);
-					setCsvUploadStatus("error");
-					setCsvError("Processing timed out. Please try again.");
-				}
-			} catch (error) {
-				clearInterval(poll);
-				setCsvUploadStatus("error");
-				setCsvError(
-					error instanceof Error
-						? error.message
-						: "Failed to check CSV status.",
-				);
-			}
-		}, 1000); // Poll every second
-	}, [session.setCsvStatus, session.setCsvUploaded]);
+  const pollCsvStatus = useCallback(
+    async (sessionId: string) => {
+      const maxAttempts = 120; // 2 minutes max (120 * 1 second)
+      let attempts = 0;
+
+      const poll = setInterval(async () => {
+        attempts++;
+
+        try {
+          const status = await apiClient.getSessionStatus(sessionId);
+
+          if (status.csv_status === "completed") {
+            clearInterval(poll);
+            setCsvUploadStatus("success");
+            session.setCsvStatus("completed");
+            session.setCsvUploaded(true);
+
+            // Update progress to 100%
+            if (status.books_processed && status.books_total) {
+              setCsvProgress(
+                Math.round((status.books_processed / status.books_total) * 100),
+              );
+            }
+          } else if (status.csv_status === "failed") {
+            clearInterval(poll);
+            setCsvUploadStatus("error");
+            setCsvError("CSV processing failed. Please try again.");
+            session.setCsvStatus("failed");
+          } else if (status.csv_status === "processing") {
+            // Update progress
+            if (status.books_processed && status.books_total) {
+              setCsvProgress(
+                Math.round((status.books_processed / status.books_total) * 100),
+              );
+            }
+            session.setCsvStatus("processing");
+          }
+
+          // Timeout after max attempts
+          if (attempts >= maxAttempts) {
+            clearInterval(poll);
+            setCsvUploadStatus("error");
+            setCsvError("Processing timed out. Please try again.");
+          }
+        } catch (error) {
+          clearInterval(poll);
+          setCsvUploadStatus("error");
+          setCsvError(
+            error instanceof Error
+              ? error.message
+              : "Failed to check CSV status.",
+          );
+        }
+      }, 1000); // Poll every second
+    },
+    [session.setCsvStatus, session.setCsvUploaded],
+  );
 
   // Check if user has existing session with CSV data and resume polling if needed
   useEffect(() => {

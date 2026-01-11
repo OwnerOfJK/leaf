@@ -158,15 +158,26 @@ export function CSVUpload({
     );
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleClick();
+    }
+  };
+
   // Default: idle state (upload prompt)
   return (
     <div className="w-full">
+      {/* biome-ignore lint/a11y/useSemanticElements: Drag-and-drop zones need div for proper drag event handling */}
       <div
+        role="button"
+        tabIndex={0}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         className={`
           border-2 border-dashed rounded-component p-8
           cursor-pointer transition-all duration-300
