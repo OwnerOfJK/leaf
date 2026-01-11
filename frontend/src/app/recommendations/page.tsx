@@ -117,7 +117,8 @@ export default function RecommendationsPage() {
 
   // Sort and reorder for podium effect: 2nd, 1st, 3rd (left to right)
   const sorted = [...recommendations].sort((a, b) => a.rank - b.rank);
-  const podiumOrder = [sorted[1], sorted[0], sorted[2]];
+  const podiumOrder =
+    sorted.length >= 3 ? [sorted[1], sorted[0], sorted[2]] : sorted;
 
   if (!session.session_id) {
     return null; // Will redirect via useEffect
