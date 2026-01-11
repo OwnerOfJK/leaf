@@ -29,21 +29,23 @@ def upgrade() -> None:
         WHERE isbn13 IS NULL AND isbn IS NOT NULL
     """)
 
-    # Step 2: Drop the unique constraint/index on isbn
-    op.drop_constraint('books_isbn_key', 'books', type_='unique')
+    # Step 2: Drop the unique index on isbn (created in previous migration as ix_books_isbn)
     op.drop_index('ix_books_isbn', table_name='books')
 
-    # Step 3: Make isbn13 NOT NULL
+    # Step 3: Drop the existing non-unique index on isbn13
+    op.drop_index('ix_books_isbn13', table_name='books')
+
+    # Step 4: Make isbn13 NOT NULL
     op.alter_column('books', 'isbn13',
                     existing_type=sa.String(length=20),
                     nullable=False)
 
-    # Step 4: Make isbn nullable
+    # Step 5: Make isbn nullable
     op.alter_column('books', 'isbn',
                     existing_type=sa.String(length=20),
                     nullable=True)
 
-    # Step 5: Create unique constraint on isbn13 and regular index on isbn
+    # Step 6: Create unique index on isbn13 and regular index on isbn
     op.create_index('ix_books_isbn13', 'books', ['isbn13'], unique=True)
     op.create_index('ix_books_isbn', 'books', ['isbn'], unique=False)
 
@@ -51,7 +53,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Reverse the process
 
-    # Step 1: Drop new indexes
+    # Step 1: Drop indexes
     op.drop_index('ix_books_isbn', table_name='books')
     op.drop_index('ix_books_isbn13', table_name='books')
 
@@ -65,9 +67,8 @@ def downgrade() -> None:
                     existing_type=sa.String(length=20),
                     nullable=True)
 
-    # Step 4: Recreate original unique constraint on isbn
+    # Step 4: Recreate original unique index on isbn
     op.create_index('ix_books_isbn', 'books', ['isbn'], unique=True)
-    op.create_constraint('books_isbn_key', 'books', type_='unique', columns=['isbn'])
 
     # Step 5: Recreate non-unique index on isbn13
     op.create_index('ix_books_isbn13', 'books', ['isbn13'], unique=False)
