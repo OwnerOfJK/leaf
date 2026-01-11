@@ -11,7 +11,21 @@ export async function GET(
     const response = await fetch(
       `${BACKEND_URL}/api/sessions/${sessionId}/recommendations`,
     );
-    const data = await response.json();
+
+    const text = await response.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error("Backend returned non-JSON response:", text);
+      return new Response(
+        JSON.stringify({ detail: "Backend returned invalid response" }),
+        {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
 
     return new Response(JSON.stringify(data), {
       status: response.status,
