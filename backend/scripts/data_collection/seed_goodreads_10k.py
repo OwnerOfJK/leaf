@@ -88,18 +88,22 @@ def process_books(csv_path: Path, limit: int | None = None) -> dict:
                         f"Added: {books_added}, Existing: {books_existing}, Failed: {books_failed}"
                     )
 
-                # Check if book exists in database (by ISBN or ISBN13)
-                # According to deduplication strategy: use ISBN as primary key
+                # Check if book exists in database (isbn13 is primary identifier)
                 existing_book = None
-                if book_data["isbn"]:
-                    existing_book = db.query(Book).filter(Book.isbn == book_data["isbn"]).first()
-
-                # If not found by ISBN, try ISBN13
-                if not existing_book and book_data["isbn13"]:
+                if book_data["isbn13"]:
                     existing_book = db.query(Book).filter(
                         or_(
-                            Book.isbn == book_data["isbn13"],
-                            Book.isbn13 == book_data["isbn13"]
+                            Book.isbn13 == book_data["isbn13"],
+                            Book.isbn == book_data["isbn13"]
+                        )
+                    ).first()
+
+                # If not found by ISBN13, try ISBN
+                if not existing_book and book_data["isbn"]:
+                    existing_book = db.query(Book).filter(
+                        or_(
+                            Book.isbn13 == book_data["isbn"],
+                            Book.isbn == book_data["isbn"]
                         )
                     ).first()
 
@@ -124,6 +128,25 @@ def process_books(csv_path: Path, limit: int | None = None) -> dict:
                         f"(ISBN: {book_data['isbn']}, ISBN13: {book_data['isbn13']})"
                     )
                     continue
+
+                # Validate and normalize ISBN identifiers
+                # isbn13 is required for database, isbn (ISBN-10) is optional
+                google_isbn = google_data.get("isbn")
+                google_isbn13 = google_data.get("isbn13")
+
+                if not google_isbn and not google_isbn13:
+                    # No ISBN identifiers from Google Books - skip this book
+                    books_failed += 1
+                    logger.warning(
+                        f"Skipping book (no ISBN in Google Books response): {google_data.get('title')} "
+                        f"by {google_data.get('author')}"
+                    )
+                    continue
+
+                # Ensure isbn13 is always set (required field in database)
+                if not google_isbn13 and google_isbn:
+                    google_data["isbn13"] = google_isbn
+                    logger.debug(f"Using ISBN-10 as ISBN-13 for: {google_data.get('title')}")
 
                 # Truncate description to MAX_DESCRIPTION_LENGTH
                 description = google_data.get("description")

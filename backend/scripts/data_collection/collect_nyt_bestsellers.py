@@ -366,13 +366,15 @@ class NYTCollector:
 
         self.isbns_seen.add(dedup_key)
 
-        # Check if book exists in database
+        # Check if book exists in database (isbn13 is primary identifier)
         existing_book = None
-        if isbn:
-            existing_book = db.query(Book).filter(Book.isbn == isbn).first()
-        if not existing_book and isbn13:
+        if isbn13:
             existing_book = db.query(Book).filter(
-                or_(Book.isbn == isbn13, Book.isbn13 == isbn13)
+                or_(Book.isbn13 == isbn13, Book.isbn == isbn13)
+            ).first()
+        if not existing_book and isbn:
+            existing_book = db.query(Book).filter(
+                or_(Book.isbn13 == isbn, Book.isbn == isbn)
             ).first()
 
         if existing_book:
@@ -403,6 +405,25 @@ class NYTCollector:
                 f"(ISBN: {isbn}, ISBN13: {isbn13})"
             )
             return
+
+        # Validate and normalize ISBN identifiers
+        # isbn13 is required for database, isbn (ISBN-10) is optional
+        google_isbn = google_data.get("isbn")
+        google_isbn13 = google_data.get("isbn13")
+
+        if not google_isbn and not google_isbn13:
+            # No ISBN identifiers from Google Books - skip this book
+            self.books_failed += 1
+            logger.warning(
+                f"✗ FAILED - No ISBN in Google Books response: {google_data.get('title')} "
+                f"by {google_data.get('author')}"
+            )
+            return
+
+        # Ensure isbn13 is always set (required field in database)
+        if not google_isbn13 and google_isbn:
+            google_data["isbn13"] = google_isbn
+            logger.debug(f"Using ISBN-10 as ISBN-13 for: {google_data.get('title')}")
 
         # Truncate description
         description = google_data.get("description")
