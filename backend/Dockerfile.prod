@@ -18,6 +18,7 @@ COPY . .
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+RUN mkdir -p /tmp/leaf_csv_uploads && chown appuser:appuser /tmp/leaf_csv_uploads
 USER appuser
 
 # Expose port
