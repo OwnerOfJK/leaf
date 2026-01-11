@@ -27,8 +27,8 @@ class Book(Base):
 
     # Identity
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    isbn: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
-    isbn13: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    isbn: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    isbn13: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
 
     # Core Metadata
     title: Mapped[str] = mapped_column(Text, nullable=False)
