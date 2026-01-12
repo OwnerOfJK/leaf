@@ -34,6 +34,10 @@ class Book(Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     author: Mapped[str] = mapped_column(Text, nullable=False)
 
+    # Normalized fields for deduplication (lowercase, no punctuation)
+    title_normalized: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
+    author_normalized: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
+
     # Rich Metadata (from Google Books API)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     categories: Mapped[List[str] | None] = mapped_column(ARRAY(Text), nullable=True)
