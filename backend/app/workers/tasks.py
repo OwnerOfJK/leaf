@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.dialects.postgresql import insert
 
 from app.constants import CSV_PROGRESS_UPDATE_INTERVAL, MAX_DESCRIPTION_LENGTH
@@ -11,26 +11,34 @@ from app.core.database import SessionLocal
 from app.core.embeddings import create_embeddings_batch, format_book_text
 from app.core.redis_client import session_manager
 from app.models.database import Book
-from app.services.google_books_api import fetch_from_google_books
-from app.utils.csv_processor import parse_goodreads_csv, validate_csv_file
+from app.services.google_books_api import fetch_from_google_books, search_by_title_author
+from app.utils.csv_processor import (
+    get_csv_preview,
+    normalize_author,
+    normalize_title,
+    parse_flexible_csv,
+    validate_csv_file,
+)
 from app.utils.isbn_utils import normalize_isbn
+from app.utils.schema_detector import detect_csv_schema
 from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
 @celery_app.task(name="app.workers.tasks.process_csv_upload", bind=True)
 def process_csv_upload(self, session_id: str, file_path: str) -> dict:
-    """Process uploaded Goodreads CSV file asynchronously.
+    """Process uploaded CSV file asynchronously with flexible format support.
 
     This task:
-    1. Parses the CSV file
-    2. For each book:
-       - Checks if it exists in PostgreSQL
+    1. Detects CSV schema using LLM
+    2. Parses the CSV file using detected schema
+    3. For each book:
+       - Checks if it exists in PostgreSQL (by ISBN or title+author)
        - If not, fetches metadata from Google Books API
        - Generates embedding
        - Inserts into database
-    3. Updates Redis session with user's book IDs, ratings, and read status
-    4. Updates CSV processing status
+    4. Updates Redis session with user's book IDs, ratings, and read status
+    5. Updates CSV processing status
 
     Args:
         session_id: Session ID for tracking
@@ -58,8 +66,14 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
         # Validate CSV file
         validate_csv_file(csv_path)
 
-        # Parse CSV
-        books_from_csv = parse_goodreads_csv(csv_path)
+        # Step 1: Detect CSV schema using LLM
+        logger.info("Detecting CSV schema...")
+        headers, sample_rows = get_csv_preview(csv_path)
+        schema_mapping = detect_csv_schema(headers, sample_rows)
+        logger.info(f"Detected schema: {schema_mapping}")
+
+        # Step 2: Parse CSV using detected schema
+        books_from_csv = parse_flexible_csv(csv_path, schema_mapping)
         total_books = len(books_from_csv)
         logger.info(f"Parsed {total_books} books from CSV")
 
@@ -90,35 +104,54 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                     "failed": books_failed
                 })
 
+                # Extract book data
+                isbn = book_data.get("isbn")
+                isbn13 = book_data.get("isbn13")
+                title = book_data.get("title", "Unknown Title")
+                author = book_data.get("author", "Unknown Author")
+                title_normalized = book_data.get("title_normalized") or normalize_title(title)
+                author_normalized = book_data.get("author_normalized") or normalize_author(author)
+
                 # Normalize ISBNs for consistent deduplication
-                isbn = book_data["isbn"]
-                isbn13 = book_data["isbn13"]
                 normalized_key = normalize_isbn(isbn13) or normalize_isbn(isbn)
 
-                if not normalized_key:
-                    # No valid ISBN - skip
-                    books_failed += 1
-                    logger.warning(f"Skipping book (invalid ISBN): {book_data['title']} (ISBN: {isbn}, ISBN13: {isbn13})")
-                    continue
+                # Create a dedup key for this batch (use ISBN if available, else title+author)
+                if normalized_key:
+                    batch_dedup_key = f"isbn:{normalized_key}"
+                else:
+                    batch_dedup_key = f"ta:{title_normalized}:{author_normalized}"
 
                 # Skip if already seen in this batch
-                if normalized_key in isbns_seen:
+                if batch_dedup_key in isbns_seen:
                     continue
-                isbns_seen.add(normalized_key)
+                isbns_seen.add(batch_dedup_key)
 
-                # Check if book exists in database using normalized ISBN
-                existing_book = db.query(Book).filter(
-                    or_(Book.isbn13 == normalized_key, Book.isbn == normalized_key)
-                ).first()
+                # Check if book exists in database
+                existing_book = None
 
-                # Also check with original ISBNs as fallback
-                if not existing_book and isbn13:
+                # First: Check by ISBN (if available)
+                if normalized_key:
                     existing_book = db.query(Book).filter(
-                        or_(Book.isbn13 == isbn13, Book.isbn == isbn13)
+                        or_(Book.isbn13 == normalized_key, Book.isbn == normalized_key)
                     ).first()
-                if not existing_book and isbn:
+
+                    # Also check with original ISBNs as fallback
+                    if not existing_book and isbn13:
+                        existing_book = db.query(Book).filter(
+                            or_(Book.isbn13 == isbn13, Book.isbn == isbn13)
+                        ).first()
+                    if not existing_book and isbn:
+                        existing_book = db.query(Book).filter(
+                            or_(Book.isbn13 == isbn, Book.isbn == isbn)
+                        ).first()
+
+                # Second: Check by normalized title+author (catches different editions)
+                if not existing_book and title_normalized and author_normalized:
                     existing_book = db.query(Book).filter(
-                        or_(Book.isbn13 == isbn, Book.isbn == isbn)
+                        and_(
+                            Book.title_normalized == title_normalized,
+                            Book.author_normalized == author_normalized
+                        )
                     ).first()
 
                 if existing_book:
@@ -128,27 +161,32 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                         "book_id": existing_book.id,
                         "title": existing_book.title,
                         "author": existing_book.author,
-                        "user_rating": book_data["user_rating"],
-                        "exclusive_shelf": book_data["exclusive_shelf"]
+                        "user_rating": book_data.get("user_rating", 0),
+                        "exclusive_shelf": book_data.get("exclusive_shelf", "read")
                     })
                     logger.debug(f"Book exists: {existing_book.title} (ID: {existing_book.id})")
                     continue
 
                 # Book doesn't exist - fetch from Google Books API
-                # Try ISBN first, then ISBN13
                 google_data = None
+
+                # Strategy 1: Try ISBN lookup (most accurate)
                 if isbn:
                     google_data = fetch_from_google_books(isbn)
-                # Retry with ISBN13 if first attempt failed or returned quota error
                 if (not google_data or google_data == "QUOTA_EXCEEDED") and isbn13:
                     google_data = fetch_from_google_books(isbn13)
+
+                # Strategy 2: If no ISBN or ISBN lookup failed, try title+author search
+                if (not google_data or google_data == "QUOTA_EXCEEDED") and title != "Unknown Title":
+                    logger.info(f"No ISBN available, searching by title+author: '{title}' by '{author}'")
+                    google_data = search_by_title_author(title, author)
 
                 if not google_data or google_data == "QUOTA_EXCEEDED":
                     # Could not fetch from Google Books - skip this book
                     books_failed += 1
                     reason = "quota exceeded" if google_data == "QUOTA_EXCEEDED" else "not found in Google Books"
                     logger.warning(
-                        f"Skipping book ({reason}): {book_data['title']} "
+                        f"Skipping book ({reason}): {title} by {author} "
                         f"(ISBN: {isbn}, ISBN13: {isbn13})"
                     )
                     continue
@@ -201,8 +239,8 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                 new_books_to_add.append({
                     "google_data": google_data,
                     "embedding_text": embedding_text,
-                    "user_rating": book_data["user_rating"],
-                    "exclusive_shelf": book_data["exclusive_shelf"]
+                    "user_rating": book_data.get("user_rating", 0),
+                    "exclusive_shelf": book_data.get("exclusive_shelf", "read")
                 })
 
                 logger.debug(
@@ -243,12 +281,16 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                 for book_info, embedding in zip(new_books_to_add, all_embeddings):
                     google_data = book_info["google_data"]
                     isbn13 = google_data["isbn13"]
+                    book_title = google_data["title"]
+                    book_author = google_data["author"]
 
                     book_records.append({
                         "isbn": google_data["isbn"],
                         "isbn13": isbn13,
-                        "title": google_data["title"],
-                        "author": google_data["author"],
+                        "title": book_title,
+                        "author": book_author,
+                        "title_normalized": normalize_title(book_title),
+                        "author_normalized": normalize_author(book_author),
                         "description": google_data.get("description"),
                         "categories": google_data.get("categories"),
                         "page_count": google_data.get("page_count"),
