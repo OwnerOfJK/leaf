@@ -30,6 +30,7 @@ backend_dir = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
 from sqlalchemy import or_
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.constants import MAX_DESCRIPTION_LENGTH
@@ -37,6 +38,7 @@ from app.core.database import SessionLocal
 from app.core.embeddings import create_embeddings_batch, format_book_text
 from app.models.database import Book
 from app.services.google_books_api import fetch_from_google_books
+from app.utils.isbn_utils import normalize_isbn
 
 # Configure logging
 logging.basicConfig(
@@ -355,20 +357,32 @@ class NYTCollector:
             book_data: Book data from NYT API
             list_name: Name of the bestseller list
         """
-        # Deduplicate: skip if we've already seen this ISBN
+        # Normalize ISBNs for consistent deduplication
         isbn = book_data["isbn"]
         isbn13 = book_data["isbn13"]
 
-        dedup_key = isbn or isbn13
-        if dedup_key in self.isbns_seen:
+        # Normalize to ISBN-13 for deduplication key
+        normalized_key = normalize_isbn(isbn13) or normalize_isbn(isbn)
+        if not normalized_key:
+            # No valid ISBN - skip
+            self.books_failed += 1
+            logger.warning(f"✗ FAILED - Invalid ISBN: {book_data['title']} (ISBN: {isbn}, ISBN13: {isbn13})")
+            return
+
+        # Deduplicate: skip if we've already seen this normalized ISBN
+        if normalized_key in self.isbns_seen:
             # Already processed this ISBN in a previous week
             return
 
-        self.isbns_seen.add(dedup_key)
+        self.isbns_seen.add(normalized_key)
 
-        # Check if book exists in database (isbn13 is primary identifier)
-        existing_book = None
-        if isbn13:
+        # Check if book exists in database using normalized ISBN
+        existing_book = db.query(Book).filter(
+            or_(Book.isbn13 == normalized_key, Book.isbn == normalized_key)
+        ).first()
+
+        # Also check with original ISBNs as fallback
+        if not existing_book and isbn13:
             existing_book = db.query(Book).filter(
                 or_(Book.isbn13 == isbn13, Book.isbn == isbn13)
             ).first()
@@ -379,7 +393,7 @@ class NYTCollector:
 
         if existing_book:
             self.books_existing += 1
-            logger.info(f"✓ Book already in database: {existing_book.title} (ISBN: {dedup_key})")
+            logger.info(f"✓ Book already in database: {existing_book.title} (ISBN: {normalized_key})")
             return
 
         # Fetch from Google Books API
@@ -406,7 +420,7 @@ class NYTCollector:
             )
             return
 
-        # Validate and normalize ISBN identifiers
+        # Validate and normalize ISBN identifiers from Google Books
         # isbn13 is required for database, isbn (ISBN-10) is optional
         google_isbn = google_data.get("isbn")
         google_isbn13 = google_data.get("isbn13")
@@ -419,6 +433,18 @@ class NYTCollector:
                 f"by {google_data.get('author')}"
             )
             return
+
+        # Normalize Google's ISBN-13 for deduplication
+        google_normalized = normalize_isbn(google_isbn13) or normalize_isbn(google_isbn)
+
+        # Check if Google returned a different ISBN than source (different edition)
+        # Add Google's normalized ISBN to seen set to prevent duplicates
+        if google_normalized and google_normalized != normalized_key:
+            if google_normalized in self.isbns_seen:
+                # Already processed this book via different source ISBN
+                logger.info(f"✓ Skipping duplicate (different edition): {google_data.get('title')} (Google ISBN: {google_normalized})")
+                return
+            self.isbns_seen.add(google_normalized)
 
         # Ensure isbn13 is always set (required field in database)
         if not google_isbn13 and google_isbn:
@@ -457,7 +483,11 @@ class NYTCollector:
             self.batch_buffer = []
 
     def _process_batch(self, db: Session) -> int:
-        """Generate embeddings for batch and insert into database."""
+        """Generate embeddings for batch and insert into database.
+
+        Uses INSERT ... ON CONFLICT DO NOTHING to handle any remaining
+        duplicate ISBN-13 values that slip through deduplication.
+        """
         if not self.batch_buffer:
             return 0
 
@@ -470,35 +500,44 @@ class NYTCollector:
             # Generate embeddings in batch
             embeddings = create_embeddings_batch(embedding_texts)
 
-            # Insert books with embeddings
-            books_added = 0
+            # Build list of book records for bulk insert
+            book_records = []
             for book_info, embedding in zip(self.batch_buffer, embeddings):
                 google_data = book_info["google_data"]
+                book_records.append({
+                    "isbn": google_data["isbn"],
+                    "isbn13": google_data["isbn13"],
+                    "title": google_data["title"],
+                    "author": google_data["author"],
+                    "description": google_data.get("description"),
+                    "categories": google_data.get("categories"),
+                    "page_count": google_data.get("page_count"),
+                    "publisher": google_data.get("publisher"),
+                    "publication_year": google_data.get("publication_year"),
+                    "language": google_data.get("language"),
+                    "average_rating": google_data.get("average_rating"),
+                    "ratings_count": google_data.get("ratings_count"),
+                    "cover_url": google_data.get("cover_url"),
+                    "embedding": embedding,
+                    "data_source": "nyt_bestseller"
+                })
 
-                new_book = Book(
-                    isbn=google_data["isbn"],
-                    isbn13=google_data["isbn13"],
-                    title=google_data["title"],
-                    author=google_data["author"],
-                    description=google_data.get("description"),
-                    categories=google_data.get("categories"),
-                    page_count=google_data.get("page_count"),
-                    publisher=google_data.get("publisher"),
-                    publication_year=google_data.get("publication_year"),
-                    language=google_data.get("language"),
-                    average_rating=google_data.get("average_rating"),
-                    ratings_count=google_data.get("ratings_count"),
-                    cover_url=google_data.get("cover_url"),
-                    embedding=embedding,
-                    data_source="nyt_bestseller"
-                )
-
-                db.add(new_book)
-                books_added += 1
-
-            # Commit batch
+            # Use INSERT ... ON CONFLICT DO NOTHING to skip duplicates
+            stmt = insert(Book).values(book_records).on_conflict_do_nothing(
+                index_elements=["isbn13"]
+            )
+            result = db.execute(stmt)
             db.commit()
-            logger.info(f"Successfully added {books_added} books to database")
+
+            # rowcount gives actual inserted rows (excludes conflicts)
+            books_added = result.rowcount if result.rowcount >= 0 else len(book_records)
+            skipped = len(book_records) - books_added
+
+            if skipped > 0:
+                logger.info(f"Inserted {books_added} books, skipped {skipped} duplicates")
+            else:
+                logger.info(f"Successfully added {books_added} books to database")
+
             return books_added
 
         except Exception as e:
