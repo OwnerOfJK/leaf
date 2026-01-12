@@ -83,7 +83,7 @@ export function CSVUpload({
             <CheckCircle className="w-6 h-6 text-success" strokeWidth={2} />
             <div>
               <p className="font-semibold text-primary">
-                {fileName || "Goodreads library uploaded"}
+                {fileName || "Library uploaded"}
               </p>
               <p className="text-sm text-muted">
                 Your reading history is ready
@@ -141,7 +141,7 @@ export function CSVUpload({
               <p className="font-semibold text-primary">Upload failed</p>
               <p className="text-sm text-error">
                 {errorMessage ||
-                  "Please ensure you're using a valid Goodreads export file."}
+                  "Please ensure you're using a valid CSV file with book data."}
               </p>
             </div>
           </div>
@@ -202,24 +202,14 @@ export function CSVUpload({
 
           <div className="flex items-center gap-2 flex-wrap justify-center">
             <p className="text-lg font-bold text-primary">
-              Upload Your Goodreads Library
+              Upload Your Book Library
             </p>
-            <a
-              href="https://www.goodreads.com/review/import"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-sm text-secondary hover:underline font-medium"
-            >
-              (Export Guide)
-            </a>
           </div>
 
-          <p className="text-sm text-muted max-w-md font-light">
-            Help us personalize your recommendations by sharing your reading
-            history
+          <p className="text-sm text-muted font-light">
+            Upload a CSV with your books (Goodreads, LibraryThing, or any format)
             <span className="block mt-1 text-xs italic">
-              (Optional, but highly recommended)
+              (Optional, but highly recommended for personalized recommendations)
             </span>
           </p>
         </div>
