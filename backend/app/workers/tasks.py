@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 
 from sqlalchemy import or_
+from sqlalchemy.dialects.postgresql import insert
 
 from app.constants import CSV_PROGRESS_UPDATE_INTERVAL, MAX_DESCRIPTION_LENGTH
 from app.core.database import SessionLocal
@@ -12,6 +13,7 @@ from app.core.redis_client import session_manager
 from app.models.database import Book
 from app.services.google_books_api import fetch_from_google_books
 from app.utils.csv_processor import parse_goodreads_csv, validate_csv_file
+from app.utils.isbn_utils import normalize_isbn
 from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -66,6 +68,9 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
         books_failed = 0
         user_books = []  # List of {book_id, title, author, user_rating, exclusive_shelf}
 
+        # Track seen ISBNs (normalized to ISBN-13) for deduplication within batch
+        isbns_seen = set()
+
         # Pass 1: Collect existing books and new books needing embeddings
         new_books_to_add = []  # List of {google_data, embedding_text, user_rating, exclusive_shelf}
 
@@ -85,15 +90,36 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                     "failed": books_failed
                 })
 
-                # Check if book exists in database (by ISBN or ISBN13)
+                # Normalize ISBNs for consistent deduplication
+                isbn = book_data["isbn"]
+                isbn13 = book_data["isbn13"]
+                normalized_key = normalize_isbn(isbn13) or normalize_isbn(isbn)
+
+                if not normalized_key:
+                    # No valid ISBN - skip
+                    books_failed += 1
+                    logger.warning(f"Skipping book (invalid ISBN): {book_data['title']} (ISBN: {isbn}, ISBN13: {isbn13})")
+                    continue
+
+                # Skip if already seen in this batch
+                if normalized_key in isbns_seen:
+                    continue
+                isbns_seen.add(normalized_key)
+
+                # Check if book exists in database using normalized ISBN
                 existing_book = db.query(Book).filter(
-                    or_(
-                        Book.isbn == book_data["isbn"] if book_data["isbn"] else False,
-                        Book.isbn13 == book_data["isbn13"] if book_data["isbn13"] else False,
-                        Book.isbn == book_data["isbn13"] if book_data["isbn13"] else False,
-                        Book.isbn13 == book_data["isbn"] if book_data["isbn"] else False,
-                    )
+                    or_(Book.isbn13 == normalized_key, Book.isbn == normalized_key)
                 ).first()
+
+                # Also check with original ISBNs as fallback
+                if not existing_book and isbn13:
+                    existing_book = db.query(Book).filter(
+                        or_(Book.isbn13 == isbn13, Book.isbn == isbn13)
+                    ).first()
+                if not existing_book and isbn:
+                    existing_book = db.query(Book).filter(
+                        or_(Book.isbn13 == isbn, Book.isbn == isbn)
+                    ).first()
 
                 if existing_book:
                     # Book already exists
@@ -111,11 +137,11 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                 # Book doesn't exist - fetch from Google Books API
                 # Try ISBN first, then ISBN13
                 google_data = None
-                if book_data["isbn"]:
-                    google_data = fetch_from_google_books(book_data["isbn"])
+                if isbn:
+                    google_data = fetch_from_google_books(isbn)
                 # Retry with ISBN13 if first attempt failed or returned quota error
-                if (not google_data or google_data == "QUOTA_EXCEEDED") and book_data["isbn13"]:
-                    google_data = fetch_from_google_books(book_data["isbn13"])
+                if (not google_data or google_data == "QUOTA_EXCEEDED") and isbn13:
+                    google_data = fetch_from_google_books(isbn13)
 
                 if not google_data or google_data == "QUOTA_EXCEEDED":
                     # Could not fetch from Google Books - skip this book
@@ -123,11 +149,11 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                     reason = "quota exceeded" if google_data == "QUOTA_EXCEEDED" else "not found in Google Books"
                     logger.warning(
                         f"Skipping book ({reason}): {book_data['title']} "
-                        f"(ISBN: {book_data['isbn']}, ISBN13: {book_data['isbn13']})"
+                        f"(ISBN: {isbn}, ISBN13: {isbn13})"
                     )
                     continue
 
-                # Validate and normalize ISBN identifiers
+                # Validate and normalize ISBN identifiers from Google Books
                 # isbn13 is required for database, isbn (ISBN-10) is optional
                 google_isbn = google_data.get("isbn")
                 google_isbn13 = google_data.get("isbn13")
@@ -140,6 +166,18 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                         f"by {google_data.get('author')}"
                     )
                     continue
+
+                # Normalize Google's ISBN-13 for deduplication
+                google_normalized = normalize_isbn(google_isbn13) or normalize_isbn(google_isbn)
+
+                # Check if Google returned a different ISBN than source (different edition)
+                # Add Google's normalized ISBN to seen set to prevent duplicates
+                if google_normalized and google_normalized != normalized_key:
+                    if google_normalized in isbns_seen:
+                        # Already processed this book via different source ISBN
+                        logger.debug(f"Skipping duplicate (different edition): {google_data.get('title')}")
+                        continue
+                    isbns_seen.add(google_normalized)
 
                 # Ensure isbn13 is always set (required field)
                 if not google_isbn13 and google_isbn:
@@ -198,41 +236,68 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                     all_embeddings.extend(batch_embeddings)
                     logger.debug(f"Generated {len(batch_embeddings)} embeddings (batch {i//batch_size + 1})")
 
-                # Pass 3: Insert all books with embeddings into database
+                # Pass 3: Build book records for bulk insert
+                book_records = []
+                isbn13_to_user_data = {}  # Map isbn13 -> user data for later lookup
+
                 for book_info, embedding in zip(new_books_to_add, all_embeddings):
                     google_data = book_info["google_data"]
+                    isbn13 = google_data["isbn13"]
 
-                    new_book = Book(
-                        isbn=google_data["isbn"],
-                        isbn13=google_data["isbn13"],
-                        title=google_data["title"],
-                        author=google_data["author"],
-                        description=google_data.get("description"),
-                        categories=google_data.get("categories"),
-                        page_count=google_data.get("page_count"),
-                        publisher=google_data.get("publisher"),
-                        publication_year=google_data.get("publication_year"),
-                        language=google_data.get("language"),
-                        average_rating=google_data.get("average_rating"),
-                        ratings_count=google_data.get("ratings_count"),
-                        cover_url=google_data.get("cover_url"),
-                        embedding=embedding,
-                        data_source="google_books"
-                    )
-
-                    db.add(new_book)
-                    db.flush()  # Get the book ID without committing
-                    books_added += 1
-
-                    user_books.append({
-                        "book_id": new_book.id,
-                        "title": new_book.title,
-                        "author": new_book.author,
-                        "user_rating": book_info["user_rating"],
-                        "exclusive_shelf": book_info["exclusive_shelf"]
+                    book_records.append({
+                        "isbn": google_data["isbn"],
+                        "isbn13": isbn13,
+                        "title": google_data["title"],
+                        "author": google_data["author"],
+                        "description": google_data.get("description"),
+                        "categories": google_data.get("categories"),
+                        "page_count": google_data.get("page_count"),
+                        "publisher": google_data.get("publisher"),
+                        "publication_year": google_data.get("publication_year"),
+                        "language": google_data.get("language"),
+                        "average_rating": google_data.get("average_rating"),
+                        "ratings_count": google_data.get("ratings_count"),
+                        "cover_url": google_data.get("cover_url"),
+                        "embedding": embedding,
+                        "data_source": "google_books"
                     })
 
-                    logger.info(f"Added new book: {new_book.title} (ID: {new_book.id})")
+                    # Store user-specific data for later lookup
+                    isbn13_to_user_data[isbn13] = {
+                        "user_rating": book_info["user_rating"],
+                        "exclusive_shelf": book_info["exclusive_shelf"]
+                    }
+
+                # Use INSERT ... ON CONFLICT DO NOTHING to skip duplicates
+                stmt = insert(Book).values(book_records).on_conflict_do_nothing(
+                    index_elements=["isbn13"]
+                )
+                result = db.execute(stmt)
+                db.flush()
+
+                # Get actual inserted count
+                inserted_count = result.rowcount if result.rowcount >= 0 else len(book_records)
+                skipped_count = len(book_records) - inserted_count
+                books_added += inserted_count
+
+                if skipped_count > 0:
+                    logger.info(f"Inserted {inserted_count} books, skipped {skipped_count} duplicates")
+
+                # Query for all books by isbn13 to get their IDs (includes both inserted and existing)
+                isbn13_list = list(isbn13_to_user_data.keys())
+                inserted_books = db.query(Book).filter(Book.isbn13.in_(isbn13_list)).all()
+
+                for book in inserted_books:
+                    user_data = isbn13_to_user_data.get(book.isbn13)
+                    if user_data:
+                        user_books.append({
+                            "book_id": book.id,
+                            "title": book.title,
+                            "author": book.author,
+                            "user_rating": user_data["user_rating"],
+                            "exclusive_shelf": user_data["exclusive_shelf"]
+                        })
+                        logger.info(f"Added book to user library: {book.title} (ID: {book.id})")
 
             except Exception as e:
                 logger.error(f"Error during batch embedding generation: {e}", exc_info=True)
