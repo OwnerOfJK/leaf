@@ -123,6 +123,7 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
 
                 # Skip if already seen in this batch
                 if batch_dedup_key in isbns_seen:
+                    logger.info(f"Skipping duplicate in batch: '{title}' by '{author}' (key: {batch_dedup_key})")
                     continue
                 isbns_seen.add(batch_dedup_key)
 
@@ -164,7 +165,10 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                         "user_rating": book_data.get("user_rating", 0),
                         "exclusive_shelf": book_data.get("exclusive_shelf", "read")
                     })
-                    logger.debug(f"Book exists: {existing_book.title} (ID: {existing_book.id})")
+                    logger.info(
+                        f"Skipping existing book: '{existing_book.title}' by '{existing_book.author}' "
+                        f"(DB ID: {existing_book.id}, ISBN13: {existing_book.isbn13})"
+                    )
                     continue
 
                 # Book doesn't exist - fetch from Google Books API
@@ -213,7 +217,10 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                 if google_normalized and google_normalized != normalized_key:
                     if google_normalized in isbns_seen:
                         # Already processed this book via different source ISBN
-                        logger.debug(f"Skipping duplicate (different edition): {google_data.get('title')}")
+                        logger.info(
+                            f"Skipping duplicate edition: '{google_data.get('title')}' by '{google_data.get('author')}' "
+                            f"(Google ISBN13: {google_normalized}, source ISBN: {normalized_key})"
+                        )
                         continue
                     isbns_seen.add(google_normalized)
 
