@@ -346,7 +346,7 @@ export default function RecommendationsPage() {
                     <p className="text-xs font-bold text-primary uppercase tracking-wider">
                       Why We Recommend This
                     </p>
-                    <p className="text-sm text-text leading-relaxed line-clamp-4">
+                    <p className="text-sm text-text leading-relaxed">
                       {rec.explanation}
                     </p>
                   </div>
