@@ -11,7 +11,11 @@ from app.core.database import SessionLocal
 from app.core.embeddings import create_embeddings_batch, format_book_text
 from app.core.redis_client import session_manager
 from app.models.database import Book
-from app.services.google_books_api import fetch_from_google_books, search_by_title_author
+from app.services.google_books_api import (
+    fetch_from_google_books,
+    reset_quota_circuit,
+    search_by_title_author,
+)
 from app.utils.csv_processor import (
     get_csv_preview,
     normalize_author,
@@ -57,6 +61,9 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
     """
     db = SessionLocal()
     csv_path = Path(file_path)
+
+    # Reset Google Books API circuit breaker for this task
+    reset_quota_circuit()
 
     try:
         # Update status to processing

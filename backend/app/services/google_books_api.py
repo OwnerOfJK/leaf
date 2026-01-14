@@ -16,6 +16,21 @@ GOOGLE_BOOKS_BASE_URL = "https://www.googleapis.com/books/v1/volumes"
 MAX_RETRIES = 10
 RETRY_BACKOFF = [1, 2, 5, 10, 20, 30, 60, 90, 120, 180]  # seconds for each retry
 
+# Circuit breaker state - prevents repeated API calls after quota exhaustion
+_quota_exhausted = False
+
+
+def is_quota_exhausted() -> bool:
+    """Check if Google Books API quota has been exhausted."""
+    return _quota_exhausted
+
+
+def reset_quota_circuit() -> None:
+    """Reset the quota circuit breaker. Call at the start of each task."""
+    global _quota_exhausted
+    _quota_exhausted = False
+    logger.debug("Google Books API quota circuit breaker reset")
+
 
 def fetch_from_google_books(isbn: str) -> dict[str, Any] | None:
     """Fetch book metadata from Google Books API using ISBN.
@@ -25,6 +40,7 @@ def fetch_from_google_books(isbn: str) -> dict[str, Any] | None:
 
     Returns:
         Dictionary containing book metadata, or None if not found or error occurred.
+        Returns "QUOTA_EXCEEDED" string if API quota is exhausted.
         Structure:
         {
             'isbn': str,
@@ -42,6 +58,13 @@ def fetch_from_google_books(isbn: str) -> dict[str, Any] | None:
             'cover_url': str | None
         }
     """
+    global _quota_exhausted
+
+    # Circuit breaker: skip API call if quota already exhausted
+    if _quota_exhausted:
+        logger.debug(f"Skipping API call for ISBN {isbn} - quota circuit breaker open")
+        return "QUOTA_EXCEEDED"
+
     params = {
         "q": f"isbn:{isbn}",
         "key": settings.google_books_api_key,
@@ -65,9 +88,10 @@ def fetch_from_google_books(isbn: str) -> dict[str, Any] | None:
                 else:
                     logger.error(
                         f"QUOTA EXCEEDED: Rate limit for ISBN {isbn} after {MAX_RETRIES} attempts. "
-                        f"Google Books quota likely exhausted."
+                        f"Google Books quota likely exhausted. Opening circuit breaker."
                     )
-                    # Return a special marker to indicate quota exhaustion (not just book not found)
+                    # Set circuit breaker to prevent further API calls
+                    _quota_exhausted = True
                     return "QUOTA_EXCEEDED"
 
             # Handle other HTTP errors
@@ -155,7 +179,15 @@ def search_by_title_author(title: str, author: str) -> dict[str, Any] | None:
     Returns:
         Dictionary containing book metadata (same structure as fetch_from_google_books),
         or None if not found or error occurred.
+        Returns "QUOTA_EXCEEDED" string if API quota is exhausted.
     """
+    global _quota_exhausted
+
+    # Circuit breaker: skip API call if quota already exhausted
+    if _quota_exhausted:
+        logger.debug(f"Skipping API call for '{title}' by '{author}' - quota circuit breaker open")
+        return "QUOTA_EXCEEDED"
+
     # Build search query using intitle and inauthor operators
     query = f'intitle:"{title}" inauthor:"{author}"'
 
@@ -183,8 +215,11 @@ def search_by_title_author(title: str, author: str) -> dict[str, Any] | None:
                     continue
                 else:
                     logger.error(
-                        f"QUOTA EXCEEDED: Rate limit for '{title}' by '{author}' after {MAX_RETRIES} attempts."
+                        f"QUOTA EXCEEDED: Rate limit for '{title}' by '{author}' after {MAX_RETRIES} attempts. "
+                        f"Opening circuit breaker."
                     )
+                    # Set circuit breaker to prevent further API calls
+                    _quota_exhausted = True
                     return "QUOTA_EXCEEDED"
 
             # Handle other HTTP errors
