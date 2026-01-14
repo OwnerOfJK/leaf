@@ -107,7 +107,7 @@ services:
     networks:
       - leaf-network
     healthcheck:
-      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@worker1@$$HOSTNAME"]
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d worker1@$$HOSTNAME"]
       interval: 30s
       timeout: 30s
       retries: 3
@@ -146,7 +146,7 @@ services:
     networks:
       - leaf-network
     healthcheck:
-      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@worker2@$$HOSTNAME"]
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d worker2@$$HOSTNAME"]
       interval: 30s
       timeout: 30s
       retries: 3
@@ -178,7 +178,7 @@ services:
       - "traefik.http.services.leaf-frontend.loadbalancer.server.port=3000"
       - "traefik.docker.network=dokploy-network"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
