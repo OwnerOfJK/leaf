@@ -106,6 +106,12 @@ services:
       - csv_uploads:/tmp/leaf_csv_uploads
     networks:
       - leaf-network
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@worker1@$$HOSTNAME"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
     mem_limit: 512m
     mem_reservation: 256m
 
@@ -139,6 +145,12 @@ services:
       - csv_uploads:/tmp/leaf_csv_uploads
     networks:
       - leaf-network
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@worker2@$$HOSTNAME"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
     mem_limit: 512m
     mem_reservation: 256m
 
@@ -166,7 +178,7 @@ services:
       - "traefik.http.services.leaf-frontend.loadbalancer.server.port=3000"
       - "traefik.docker.network=dokploy-network"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
