@@ -2,7 +2,7 @@
 # LLM CONFIGURATION
 # =============================================================================
 
-LLM_MODEL = "gpt-4o-mini"
+LLM_MODEL = "gpt-4.1-mini-2025-04-14"
 """Language model used for recommendation generation."""
 
 
