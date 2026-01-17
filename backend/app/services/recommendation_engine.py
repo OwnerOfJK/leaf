@@ -307,17 +307,51 @@ For each recommendation, provide:
 2. A confidence score (0-100) indicating how well it matches the user's needs
 3. A concise explanation (2-3 sentences) of why this book is recommended based on their preferences
 
-Return your response as a JSON array with exactly 3 recommendations, ordered by relevance (best first)."""
+Return exactly 3 recommendations, ordered by relevance (best first)."""
 
     user_prompt = f"""{context}{candidates_text}
 
-Select the top 3 books that best match the user's query. Return as JSON array:
-[
-  {{"book_id": <id>, "confidence_score": <0-100>, "explanation": "<why this book>"}},
-  ...
-]"""
+Select the top 3 books that best match the user's query."""
 
-    # Call LLM
+    # JSON schema for structured outputs
+    recommendation_schema = {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "book_recommendations",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "recommendations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "book_id": {
+                                    "type": "integer",
+                                    "description": "The book ID from the candidate list",
+                                },
+                                "confidence_score": {
+                                    "type": "integer",
+                                    "description": "How well this book matches the user's needs (0-100)",
+                                },
+                                "explanation": {
+                                    "type": "string",
+                                    "description": "2-3 sentence explanation of why this book is recommended",
+                                },
+                            },
+                            "required": ["book_id", "confidence_score", "explanation"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["recommendations"],
+                "additionalProperties": False,
+            },
+        },
+    }
+
+    # Call LLM with structured outputs
     response = openai_client.chat.completions.create(
         model=LLM_MODEL,
         messages=[
@@ -325,31 +359,27 @@ Select the top 3 books that best match the user's query. Return as JSON array:
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.7,
-        response_format={"type": "json_object"},
+        response_format=recommendation_schema,
     )
 
-    # Parse response with error handling
+    # Parse response - structured outputs guarantees valid schema
     try:
         result = json.loads(response.choices[0].message.content)
+        recommendations = result["recommendations"]
     except (json.JSONDecodeError, KeyError, IndexError) as e:
         raise ValueError(f"Failed to parse LLM response: {e}")
-
-    # Handle both array and object with "recommendations" key
-    recommendations = result if isinstance(result, list) else result.get("recommendations", [])
 
     if not recommendations:
         raise ValueError("LLM returned empty recommendations")
 
-    # Validate recommendation structure
-    for rec in recommendations[:3]:
-        if "book_id" not in rec or "confidence_score" not in rec or "explanation" not in rec:
-            raise ValueError(f"Invalid recommendation structure: {rec}")
+    # Truncate to top 3 (defensive fallback)
+    recommendations = recommendations[:3]
 
     # Add rank to each recommendation
-    for i, rec in enumerate(recommendations[:3], 1):
+    for i, rec in enumerate(recommendations, 1):
         rec["rank"] = i
 
-    return recommendations[:3]
+    return recommendations
 
 
 @observe()
