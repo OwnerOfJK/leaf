@@ -100,6 +100,36 @@ class SessionManager:
         key = self._status_key(session_id)
         return self.client.get(key)
 
+    def try_acquire_csv_processing(self, session_id: str) -> bool:
+        """Atomically acquire CSV processing lock.
+
+        Uses a Lua script to ensure atomic check-and-set operation.
+        Only succeeds if current status is 'pending' (or key doesn't exist).
+        Sets status to 'processing' atomically if acquired.
+
+        This prevents race conditions where two workers could both see
+        'pending' status and attempt to process the same CSV.
+
+        Args:
+            session_id: Unique session identifier
+
+        Returns:
+            True if lock acquired (status set to 'processing'),
+            False if already processing/completed/failed.
+        """
+        script = """
+        local current = redis.call('GET', KEYS[1])
+        if current == false or current == 'pending' then
+            redis.call('SETEX', KEYS[1], ARGV[1], 'processing')
+            return 1
+        else
+            return 0
+        end
+        """
+        key = self._status_key(session_id)
+        result = self.client.eval(script, 1, key, self.ttl)
+        return result == 1
+
     def set_metadata(self, session_id: str, metadata: dict[str, Any]) -> None:
         """Set session metadata (e.g., CSV processing progress)."""
         key = self._metadata_key(session_id)

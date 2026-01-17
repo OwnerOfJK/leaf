@@ -77,6 +77,15 @@ async def create_session(
                 detail="Invalid file type. Only .csv files are allowed."
             )
 
+        # Check if CSV is already being processed (defensive check)
+        # This is a fast-path rejection - the task itself has atomic locking
+        existing_status = session_mgr.get_csv_status(session_id)
+        if existing_status in ["processing", "completed"]:
+            raise HTTPException(
+                status_code=409,
+                detail=f"CSV already {existing_status} for this session"
+            )
+
         # Save uploaded file to temporary location
         file_path = UPLOAD_DIR / f"{session_id}.csv"
         try:
@@ -84,7 +93,7 @@ async def create_session(
             file_path.write_bytes(content)
             logger.info(f"Saved CSV file for session {session_id}: {file_path}")
 
-            # Set CSV status to pending
+            # Set CSV status to pending (task will atomically upgrade to 'processing')
             session_mgr.set_csv_status(session_id, "pending")
 
             # Trigger async Celery task

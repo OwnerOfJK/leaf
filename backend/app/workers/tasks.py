@@ -66,8 +66,25 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
     reset_quota_circuit()
 
     try:
-        # Update status to processing
-        session_manager.set_csv_status(session_id, "processing")
+        # Atomically acquire CSV processing lock
+        # This prevents duplicate processing if task is triggered multiple times
+        if not session_manager.try_acquire_csv_processing(session_id):
+            current_status = session_manager.get_csv_status(session_id)
+            logger.warning(
+                f"CSV processing already in progress for session {session_id} "
+                f"(current status: {current_status}), skipping duplicate task"
+            )
+            return {
+                "status": "skipped",
+                "reason": "already_processing",
+                "current_status": current_status,
+                "books_processed": 0,
+                "books_added": 0,
+                "books_existing": 0,
+                "books_failed": 0,
+                "error": None
+            }
+
         logger.info(f"Starting CSV processing for session {session_id}")
 
         # Validate CSV file
