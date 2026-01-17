@@ -199,6 +199,18 @@ Update CSV processing progress every N books.
 Also extends session TTL at this interval to keep session alive during long processing.
 """
 
+HEARTBEAT_STALE_THRESHOLD_SECONDS = 120
+"""
+Time in seconds after which a processing task is considered dead.
+
+If no heartbeat update is received within this threshold, the status endpoint
+will report the task as failed. This handles cases where the worker crashes
+without properly updating the status to 'failed'.
+
+Should be significantly larger than the time between progress updates to
+account for slow API calls (Google Books, OpenAI embeddings).
+"""
+
 
 # =============================================================================
 # VALIDATION

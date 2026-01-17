@@ -1,6 +1,7 @@
 """Celery tasks for async processing."""
 
 import logging
+import time
 from pathlib import Path
 
 from sqlalchemy import and_, or_
@@ -87,6 +88,11 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
 
         logger.info(f"Starting CSV processing for session {session_id}")
 
+        # Set initial heartbeat to track task liveness
+        session_manager.set_metadata(session_id, {
+            "last_heartbeat": time.time(),
+        })
+
         # Validate CSV file
         validate_csv_file(csv_path)
 
@@ -119,13 +125,14 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
                     session_manager.extend_session_ttl(session_id)
                     logger.debug(f"Extended session TTL at book {idx}/{total_books}")
 
-                # Update progress metadata
+                # Update progress metadata with heartbeat
                 session_manager.set_metadata(session_id, {
                     "total_books": total_books,
                     "processed": idx,
                     "added": books_added,
                     "existing": books_existing,
-                    "failed": books_failed
+                    "failed": books_failed,
+                    "last_heartbeat": time.time(),
                 })
 
                 # Extract book data
@@ -392,13 +399,14 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
         # Update status to completed
         session_manager.set_csv_status(session_id, "completed")
 
-        # Update final metadata
+        # Update final metadata (include heartbeat for consistency)
         final_metadata = {
             "total_books": total_books,
             "processed": total_books,
             "added": books_added,
             "existing": books_existing,
-            "failed": books_failed
+            "failed": books_failed,
+            "last_heartbeat": time.time(),
         }
         session_manager.set_metadata(session_id, final_metadata)
 
@@ -420,7 +428,8 @@ def process_csv_upload(self, session_id: str, file_path: str) -> dict:
         logger.error(f"Critical error processing CSV for session {session_id}: {e}", exc_info=True)
         session_manager.set_csv_status(session_id, "failed")
         session_manager.set_metadata(session_id, {
-            "error": str(e)
+            "error": str(e),
+            "last_heartbeat": time.time(),
         })
 
         return {

@@ -9,6 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.config import get_settings
+from app.constants import HEARTBEAT_STALE_THRESHOLD_SECONDS
 from app.core.redis_client import SessionManager, get_session_manager
 from app.models.schemas import (
     GenerateQuestionRequest,
@@ -194,6 +195,25 @@ def get_session_status(
 
     # Get processing metadata
     metadata = session_mgr.get_metadata(session_id)
+
+    # Check for stale heartbeat (worker died without updating status)
+    if csv_status == "processing" and metadata:
+        last_heartbeat = metadata.get("last_heartbeat")
+        if last_heartbeat:
+            seconds_since_heartbeat = time.time() - last_heartbeat
+            if seconds_since_heartbeat > HEARTBEAT_STALE_THRESHOLD_SECONDS:
+                # Worker likely died - mark as failed
+                logger.warning(
+                    f"CSV processing for session {session_id} has stale heartbeat "
+                    f"({seconds_since_heartbeat:.1f}s old), marking as failed"
+                )
+                csv_status = "failed"
+                # Update Redis so subsequent polls also see failed status
+                session_mgr.set_csv_status(session_id, "failed")
+                session_mgr.set_metadata(session_id, {
+                    **metadata,
+                    "error": "Processing timed out (worker unresponsive)",
+                })
 
     # Build response
     response = SessionStatusResponse(
