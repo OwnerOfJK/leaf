@@ -280,10 +280,12 @@ def _generate_with_llm(
         context += f"  5★: {rating_counts[5]} | 4★: {rating_counts[4]} | 3★: {rating_counts[3]} | "
         context += f"2★: {rating_counts[2]} | 1★: {rating_counts[1]}\n\n"
 
-    # Format candidate books
+    # Format candidate books and build index-to-id mapping
+    index_to_book_id: dict[int, int] = {}
     candidates_text = "Candidate books:\n"
     for i, book in enumerate(candidate_books, 1):
-        candidates_text += f"{i}. [{book.id}] {book.title} by {book.author}\n"
+        index_to_book_id[i] = book.id
+        candidates_text += f"{i}. {book.title} by {book.author}\n"
         if book.description:
             max_len = CANDIDATE_DESCRIPTION_MAX_LENGTH
             desc = book.description[:max_len] + "..." if len(book.description) > max_len else book.description
@@ -327,9 +329,9 @@ Select the top 3 books that best match the user's query."""
                         "items": {
                             "type": "object",
                             "properties": {
-                                "book_id": {
+                                "candidate_number": {
                                     "type": "integer",
-                                    "description": "The book ID from the candidate list",
+                                    "description": "The candidate number (1, 2, 3, etc.) from the list",
                                 },
                                 "confidence_score": {
                                     "type": "integer",
@@ -340,7 +342,7 @@ Select the top 3 books that best match the user's query."""
                                     "description": "2-3 sentence explanation of why this book is recommended",
                                 },
                             },
-                            "required": ["book_id", "confidence_score", "explanation"],
+                            "required": ["candidate_number", "confidence_score", "explanation"],
                             "additionalProperties": False,
                         },
                     },
@@ -375,11 +377,24 @@ Select the top 3 books that best match the user's query."""
     # Truncate to top 3 (defensive fallback)
     recommendations = recommendations[:3]
 
-    # Add rank to each recommendation
+    # Map candidate_number to actual book_id and add rank
+    mapped_recommendations = []
     for i, rec in enumerate(recommendations, 1):
-        rec["rank"] = i
+        candidate_num = rec["candidate_number"]
+        if candidate_num not in index_to_book_id:
+            # Skip invalid candidate numbers
+            continue
+        mapped_recommendations.append({
+            "book_id": index_to_book_id[candidate_num],
+            "confidence_score": rec["confidence_score"],
+            "explanation": rec["explanation"],
+            "rank": i,
+        })
 
-    return recommendations
+    if not mapped_recommendations:
+        raise ValueError("No valid book IDs found in LLM response")
+
+    return mapped_recommendations
 
 
 @observe()
