@@ -81,7 +81,7 @@ export default function RecommendationsPage() {
   const handleFeedback = async (
     recommendationId: number,
     type: "like" | "dislike",
-    rank: number
+    rank: 1 | 2 | 3
   ) => {
     // Optimistic update
     setFeedback((prev) => ({ ...prev, [recommendationId]: type }));
@@ -89,6 +89,7 @@ export default function RecommendationsPage() {
     try {
       await apiClient.submitFeedback(recommendationId, rank, {
         feedback_type: type,
+        rank: rank,
       });
 
       // Show success message

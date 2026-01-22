@@ -15,15 +15,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import requests
-from langfuse.decorators import langfuse_context, observe
+from langfuse import get_client, observe
 from langfuse.openai import OpenAI
 
 from app.config import get_settings
-from app.core.langfuse_client import langfuse
 
 settings = get_settings()
 BASE_URL = "http://localhost:8000"
-
+langfuse = get_client()
 
 # =============================================================================
 # Test 1: Infrastructure Validation
@@ -65,7 +64,6 @@ def test_infrastructure():
 # =============================================================================
 
 
-@observe()
 def test_embedding():
     """Test embedding call with Langfuse tracking."""
     client = OpenAI(api_key=settings.openai_api_key)
@@ -80,7 +78,7 @@ def test_embedding():
     assert len(embedding) == 1536, "Embedding dimension should be 1536"
 
 
-@observe()
+@observe(name="test_chat_completion")
 def test_chat_completion():
     """Test chat completion with Langfuse tracking."""
     client = OpenAI(api_key=settings.openai_api_key)
@@ -115,7 +113,7 @@ def test_langfuse_integration():
     print("\nTesting chat completion...")
     test_chat_completion()
 
-    trace_id = langfuse_context.get_current_trace_id()
+    trace_id = langfuse.get_current_trace_id()
     trace_url = f"{settings.langfuse_base_url}/trace/{trace_id}"
 
     print("\n✅ Langfuse Integration: PASSED")
@@ -346,7 +344,7 @@ def main():
         # Flush Langfuse to ensure all data is sent
         print("\n" + "=" * 70)
         print("Flushing Langfuse data...")
-        langfuse.flush()
+        get_client.flush()
         print("✓ Langfuse data flushed")
 
         # Summary
