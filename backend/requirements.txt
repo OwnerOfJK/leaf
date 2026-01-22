@@ -16,7 +16,7 @@ celery==5.4.0
 
 # AI/ML
 openai==1.59.5
-langfuse==2.59.1
+langfuse==3.12.0
 
 # Settings management
 pydantic==2.10.5
