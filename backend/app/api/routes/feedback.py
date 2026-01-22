@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.langfuse_client import get_langfuse
+from langfuse import get_client
 from app.models.database import Recommendation
 from app.models.schemas import FeedbackResponse, FeedbackSubmit
 
@@ -17,7 +17,7 @@ def submit_feedback(
     recommendation_id: int,
     request: FeedbackSubmit,
     db: Session = Depends(get_db),
-    langfuse=Depends(get_langfuse),
+    langfuse=Depends(get_client),
 ) -> FeedbackResponse:
     """Submit feedback (like/dislike) for a recommendation.
 

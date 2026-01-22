@@ -3,7 +3,7 @@
 from typing import List
 
 from langfuse.openai import OpenAI
-from langfuse.decorators import observe
+from langfuse import observe
 
 from app.config import get_settings
 

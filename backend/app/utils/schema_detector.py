@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Any
 
-from langfuse.decorators import observe
+from langfuse import observe
 
 from app.constants import LLM_MODEL
 from app.core.embeddings import openai_client

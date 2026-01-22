@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 
-from langfuse.decorators import observe
+from langfuse import get_client, observe
 from sqlalchemy.orm import Session
 
 from app.constants import LLM_MODEL
@@ -11,6 +11,7 @@ from app.core.embeddings import openai_client
 from app.models.database import Book
 
 logger = logging.getLogger(__name__)
+langfuse = get_client()
 
 # Predefined fallback questions (used if LLM generation fails)
 FALLBACK_QUESTIONS = {

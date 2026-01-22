@@ -3,7 +3,7 @@
 import json
 from decimal import Decimal
 
-from langfuse.decorators import observe
+from langfuse import get_client, observe
 from langfuse.openai import OpenAI
 from scipy.spatial.distance import cosine as cosine_distance
 from sqlalchemy.orm import Session
@@ -31,6 +31,7 @@ from app.services import vector_search
 settings = get_settings()
 # Initialize OpenAI client with Langfuse wrapper for automatic tracking
 openai_client = OpenAI(api_key=settings.openai_api_key)
+langfuse = get_client()
 
 
 @observe()
@@ -88,10 +89,7 @@ def generate_recommendations(
         recommendations_data=recommendations_data,
     )
 
-    # Get trace_id from Langfuse context
-    from langfuse.decorators import langfuse_context
-
-    trace_id = langfuse_context.get_current_trace_id()
+    trace_id = langfuse.get_current_trace_id()
 
     return recommendations, trace_id
 
