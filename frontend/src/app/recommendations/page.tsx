@@ -81,12 +81,13 @@ export default function RecommendationsPage() {
   const handleFeedback = async (
     recommendationId: number,
     type: "like" | "dislike",
+    rank: number
   ) => {
     // Optimistic update
     setFeedback((prev) => ({ ...prev, [recommendationId]: type }));
 
     try {
-      await apiClient.submitFeedback(recommendationId, {
+      await apiClient.submitFeedback(recommendationId, rank, {
         feedback_type: type,
       });
 
@@ -354,7 +355,7 @@ export default function RecommendationsPage() {
                   {/* Feedback Buttons */}
                   <div className="flex items-center gap-3 px-6 pb-6 pt-2">
                     <Button
-                      onClick={() => handleFeedback(rec.id, "like")}
+                      onClick={() => handleFeedback(rec.id, "like", rec.rank)}
                       disabled={userFeedback !== undefined}
                       variant={userFeedback === "like" ? "default" : "outline"}
                       size="sm"
@@ -373,7 +374,7 @@ export default function RecommendationsPage() {
                     </Button>
 
                     <Button
-                      onClick={() => handleFeedback(rec.id, "dislike")}
+                      onClick={() => handleFeedback(rec.id, "dislike", rec.rank)}
                       disabled={userFeedback !== undefined}
                       variant={
                         userFeedback === "dislike" ? "default" : "outline"

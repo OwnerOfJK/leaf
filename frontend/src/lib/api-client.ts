@@ -191,6 +191,7 @@ class APIClient {
 
   async submitFeedback(
     recommendationId: number,
+    rank: number,
     feedback: FeedbackSubmit,
   ): Promise<FeedbackResponse> {
     const response = await fetch(
@@ -200,7 +201,7 @@ class APIClient {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(feedback),
+        body: JSON.stringify({ ...feedback, rank }),
       },
     );
 

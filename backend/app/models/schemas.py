@@ -148,6 +148,7 @@ class FeedbackSubmit(BaseModel):
     """Request schema for submitting feedback."""
 
     feedback_type: str = Field(..., pattern="^(like|dislike)$")
+    rank: int = Field(..., ge=1, le=3, description="Recommendation rank (1-3)")
 
 
 class FeedbackResponse(BaseModel):

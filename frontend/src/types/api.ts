@@ -100,6 +100,7 @@ export type FeedbackType = "like" | "dislike";
 
 export interface FeedbackSubmit {
   feedback_type: FeedbackType;
+  rank: 1 | 2 | 3;
 }
 
 export interface FeedbackResponse {
