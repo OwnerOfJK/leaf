@@ -292,27 +292,8 @@ def _generate_with_llm(
             candidates_text += f"   Categories: {', '.join(book.categories[:3])}\n"
         candidates_text += "\n"
 
-    # LLM prompt
-    system_prompt = """You are a book recommendation expert. Given a user's query, their reading history, and a list of candidate books, select the top 3 most relevant recommendations.
-
-Consider the following when making recommendations:
-- The user's current query and what they're looking for
-- Books they loved (high ratings) - recommend similar themes/authors/styles
-- Books they disliked (low ratings) - avoid similar books
-- Their overall rating distribution and reading preferences
-- Quality and relevance of candidate books to the query
-
-For each recommendation, provide:
-1. The book ID from the candidate list
-2. A confidence score (0-100) indicating how well it matches the user's needs
-3. A concise explanation (2-3 sentences) of why this book is recommended based on their preferences
-
-Return exactly 3 recommendations, ordered by relevance (best first)."""
-
-    user_prompt = f"""{context}{candidates_text}
-
-Select the top 3 books that best match the user's query."""
-
+    chat_prompt = langfuse.get_prompt("recommendation-prompt", label="production", type="chat")
+    compiled_chat_prompt = chat_prompt.compile(context=context, candidates_text=candidates_text)
     # JSON schema for structured outputs
     recommendation_schema = {
         "type": "json_schema",
@@ -354,10 +335,7 @@ Select the top 3 books that best match the user's query."""
     # Call LLM with structured outputs
     response = openai_client.chat.completions.create(
         model=LLM_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+        messages=compiled_chat_prompt,
         temperature=0.7,
         response_format=recommendation_schema,
     )
@@ -598,9 +576,8 @@ def _store_recommendations(
     Returns:
         List of created Recommendation objects
     """
-    from langfuse.decorators import langfuse_context
 
-    trace_id = langfuse_context.get_current_trace_id()
+    trace_id = langfuse.get_current_trace_id()
 
     recommendations = []
     for rec_data in recommendations_data:

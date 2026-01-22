@@ -54,24 +54,16 @@ def generate_question(
         conversation_history = _build_conversation_history(
             previous_questions, previous_answers
         )
-
-        # Build system prompt
-        system_prompt = _build_system_prompt(question_number)
-
-        # Build user prompt with context
-        user_prompt = _build_user_prompt(
-            question_number, initial_query, conversation_history
-        )
+        
+        chat_prompt = langfuse.get_prompt("question-prompt", label="production", type="chat")
+        compiled_chat_prompt = chat_prompt.compile(question_number=question_number, initial_query=initial_query, conversation_history=conversation_history)
 
         logger.info(f"Generating question {question_number} using {LLM_MODEL}")
 
         # Call OpenAI with Langfuse tracking
         response = openai_client.chat.completions.create(
             model=LLM_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=compiled_chat_prompt,
             temperature=0.7,
             max_tokens=150,
         )
@@ -116,49 +108,3 @@ def _build_conversation_history(
             history_parts.append(f"Q{q_num}: {question}\nA{q_num}: [skipped]")
 
     return "\n\n".join(history_parts)
-
-
-def _build_system_prompt(question_number: int) -> str:
-    """Build system prompt for the LLM.
-
-    Args:
-        question_number: Current question number
-
-    Returns:
-        System prompt string
-    """
-    return f"""You are a friendly, knowledgeable librarian helping someone find their next perfect book to read.
-
-Your goal is to ask thoughtful, conversational questions that help you understand what book would delight this person. You're having a warm conversation, not conducting an interview.
-
-Guidelines for question {question_number}:
-- Ask ONE clear, open-ended question
-- Be conversational and warm, like a helpful librarian
-- Build naturally on the conversation so far
-- Focus on understanding their reading preferences, mood, and what they're looking for
-- Keep questions concise (1-2 sentences max)
-- Avoid technical jargon - use plain, friendly language
-
-Remember: You're helping them discover their next favorite book, not interrogating them. Make it feel like a pleasant conversation."""
-
-
-def _build_user_prompt(
-    question_number: int, initial_query: str, conversation_history: str
-) -> str:
-    """Build user prompt with full context.
-
-    Args:
-        question_number: Current question number
-        initial_query: User's initial query
-        conversation_history: Formatted previous Q&As
-
-    Returns:
-        User prompt string
-    """
-    return f"""Initial request: "{initial_query}"
-
-{conversation_history}
-
-Generate question {question_number} to help understand what book would be perfect for this person.
-
-Return ONLY the question text, nothing else."""
