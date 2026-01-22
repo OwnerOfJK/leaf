@@ -16,7 +16,6 @@ openai_client = OpenAI(api_key=settings.openai_api_key)
 EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIMENSIONS = 1536
 
-@observe()
 def create_embedding(text: str) -> List[float]:
     """Generate embedding for a single text.
 
