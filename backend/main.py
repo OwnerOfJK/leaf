@@ -113,6 +113,6 @@ app.include_router(feedback.router, prefix="/api/recommendations", tags=["feedba
 @app.on_event("shutdown")
 async def shutdown_event():
     """Flush Langfuse data on application shutdown."""
-    from app.core.langfuse_client import langfuse
+    from langfuse import get_client
 
-    langfuse.flush()
+    get_client().flush()
