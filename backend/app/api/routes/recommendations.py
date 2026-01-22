@@ -1,6 +1,7 @@
 """API routes for recommendations."""
 
 from fastapi import APIRouter, Depends, HTTPException
+from langfuse import propagate_attributes
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -52,15 +53,17 @@ def get_recommendations(
         raise HTTPException(status_code=400, detail="Session has no query")
 
     # Generate recommendations using RAG pipeline
+    # Group all traces under the same Langfuse session
     try:
-        recommendations, trace_id = generate_recommendations(
-            db=db,
-            session_id=session_id,
-            query=query,
-            user_books=user_books if user_books else None,
-            follow_up_answers=follow_up_answers if follow_up_answers else None,
-            generated_questions=generated_questions if generated_questions else None,
-        )
+        with propagate_attributes(session_id=session_id):
+            recommendations, trace_id = generate_recommendations(
+                db=db,
+                session_id=session_id,
+                query=query,
+                user_books=user_books if user_books else None,
+                follow_up_answers=follow_up_answers if follow_up_answers else None,
+                generated_questions=generated_questions if generated_questions else None,
+            )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
 

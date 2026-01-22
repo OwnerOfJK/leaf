@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from langfuse import propagate_attributes
 
 from app.config import get_settings
 from app.constants import HEARTBEAT_STALE_THRESHOLD_SECONDS
@@ -334,12 +335,14 @@ def generate_follow_up_question(
 
         # Generate question using LLM (without CSV data for faster generation)
         # CSV will be processed in background and ready for recommendations
-        generated_question = generate_question(
-            question_number=question_number,
-            initial_query=session_data["initial_query"],
-            previous_questions=previous_questions,
-            previous_answers=previous_answers,
-        )
+        # Group all traces under the same Langfuse session
+        with propagate_attributes(session_id=session_id):
+            generated_question = generate_question(
+                question_number=question_number,
+                initial_query=session_data["initial_query"],
+                previous_questions=previous_questions,
+                previous_answers=previous_answers,
+            )
 
         # Store generated question in Redis
         session_mgr.store_generated_question(session_id, question_number, generated_question)
