@@ -10,14 +10,13 @@ from app.models.database import Recommendation
 from app.models.schemas import FeedbackResponse, FeedbackSubmit
 
 router = APIRouter()
-
+langfuse = get_client()
 
 @router.post("/{recommendation_id}/feedback", response_model=FeedbackResponse)
 def submit_feedback(
     recommendation_id: int,
     request: FeedbackSubmit,
     db: Session = Depends(get_db),
-    langfuse=Depends(get_client),
 ) -> FeedbackResponse:
     """Submit feedback (like/dislike) for a recommendation.
 
@@ -28,7 +27,6 @@ def submit_feedback(
         recommendation_id: Recommendation database ID
         request: Feedback submission (like/dislike)
         db: Database session
-        langfuse: Langfuse client
 
     Returns:
         Feedback submission confirmation
@@ -51,11 +49,17 @@ def submit_feedback(
 
     # Submit score to Langfuse
     try:
-        score = langfuse.score(
+        score = langfuse.create_score(
             trace_id=recommendation.trace_id,
             name="user_feedback",
             value=score_value,
-            comment=f"User {request.feedback_type}d recommendation {recommendation_id}",
+            data_type="NUMERIC",
+            metadata={
+                "recommendation_id": recommendation_id,
+                "rank": request.rank,
+                "book_id": recommendation.book_id,
+            },
+            comment=f"User {request.feedback_type}d recommendation {recommendation_id} (rank {request.rank})",
         )
 
         return FeedbackResponse(
