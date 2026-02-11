@@ -4,7 +4,9 @@ import {
   BookOpen,
   CheckCircle,
   ExternalLink,
+  Library,
   Loader2,
+  SkipForward,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
@@ -22,44 +24,111 @@ import { Header } from "../components/Header";
 
 const AMAZON_TAG = "leaf07-21";
 
+type PagePhase =
+  | "loading_recommendations"
+  | "waiting_for_csv"
+  | "csv_ready"
+  | "csv_failed"
+  | "done";
+
 export default function RecommendationsPage() {
   const router = useRouter();
   const session = useSession();
 
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<number, "like" | "dislike">>(
     {},
   );
   const [feedbackSuccess, setFeedbackSuccess] = useState<number | null>(null);
+  const [phase, setPhase] = useState<PagePhase>("loading_recommendations");
+  const [booksProcessed, setBooksProcessed] = useState<number | null>(null);
+  const [booksTotal, setBooksTotal] = useState<number | null>(null);
 
   // Track if recommendations have been loaded to prevent duplicate calls
   const hasLoadedRef = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
 
   const loadRecommendations = useCallback(async () => {
     if (!session.session_id) return;
 
+    setPhase("loading_recommendations");
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await apiClient.getRecommendations(session.session_id);
       setRecommendations(response.recommendations);
+      setPhase("done");
     } catch (error) {
       setError(
         error instanceof Error
           ? error.message
           : "We couldn't generate recommendations. Please try again.",
       );
+      setPhase("done");
     } finally {
       setIsLoading(false);
     }
   }, [session.session_id]);
 
-  // Redirect if no session and load recommendations
+  const startPolling = useCallback(() => {
+    console.log("[Recommendations] startPolling called", { session_id: session.session_id });
+    if (!session.session_id) {
+      console.log("[Recommendations] No session_id, aborting poll");
+      return;
+    }
+
+    const poll = async () => {
+      console.log("[Recommendations] Polling CSV status...");
+      try {
+        const status = await apiClient.getSessionStatus(session.session_id!);
+        console.log("[Recommendations] CSV status poll:", status);
+        setBooksProcessed(status.books_processed);
+        setBooksTotal(status.books_total);
+
+        if (status.csv_status === "completed") {
+          stopPolling();
+          session.setCsvStatus("completed");
+          setPhase("csv_ready");
+        } else if (status.csv_status === "failed") {
+          stopPolling();
+          session.setCsvStatus("failed");
+          setPhase("csv_failed");
+        }
+      } catch (error) {
+        console.error("[Recommendations] Error polling CSV status:", error);
+      }
+    };
+
+    // Poll immediately, then every 2 seconds
+    poll();
+    pollingRef.current = setInterval(poll, 2000);
+  }, [session.session_id, session.setCsvStatus, stopPolling]);
+
+  // Clean up polling on unmount
   useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
+
+  // Redirect if no session; determine initial phase
+  useEffect(() => {
+    console.log("[Recommendations] useEffect triggered", {
+      session_id: session.session_id,
+      csv_status: session.csv_status,
+      csv_uploaded: session.csv_uploaded,
+      hasLoaded: hasLoadedRef.current,
+    });
+
     if (!session.session_id) {
       router.push("/");
       return;
@@ -71,12 +140,53 @@ export default function RecommendationsPage() {
       currentSessionRef.current = session.session_id;
     }
 
-    // Only load once per session_id
-    if (!hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      loadRecommendations();
+    const csvStatus = session.csv_status;
+    const csvUploaded = session.csv_uploaded;
+
+    // If already loaded, only respond to status changes
+    if (hasLoadedRef.current) {
+      console.log("[Recommendations] Already loaded, checking for status changes");
+      // If CSV just completed, load recommendations
+      if (csvUploaded && csvStatus === "completed") {
+        console.log("[Recommendations] CSV completed after loading - loading recommendations");
+        stopPolling();
+        loadRecommendations();
+      }
+      return;
     }
-  }, [session.session_id, router, loadRecommendations]);
+
+    hasLoadedRef.current = true;
+
+    if (!csvUploaded || csvStatus === "none") {
+      console.log("[Recommendations] No CSV or status is none - loading recommendations");
+      loadRecommendations();
+    } else if (csvStatus === "completed") {
+      console.log("[Recommendations] CSV completed - loading recommendations");
+      loadRecommendations();
+    } else if (csvStatus === "processing" || csvStatus === "pending") {
+      console.log("[Recommendations] CSV processing - starting poll");
+      setPhase("waiting_for_csv");
+      startPolling();
+    } else if (csvStatus === "failed") {
+      console.log("[Recommendations] CSV failed");
+      setPhase("csv_failed");
+    }
+  }, [session.session_id, session.csv_status, session.csv_uploaded, router, loadRecommendations, startPolling]);
+
+  const handleSkipUpload = () => {
+    stopPolling();
+    session.setCsvUploaded(false);
+    loadRecommendations();
+  };
+
+  const handleGetRecommendations = () => {
+    loadRecommendations();
+  };
+
+  const handleContinueWithoutCsv = () => {
+    session.setCsvUploaded(false);
+    loadRecommendations();
+  };
 
   const handleFeedback = async (
     recommendationId: number,
@@ -125,6 +235,99 @@ export default function RecommendationsPage() {
 
   if (!session.session_id) {
     return null; // Will redirect via useEffect
+  }
+
+  if (phase === "waiting_for_csv") {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center space-y-6 opacity-0 animate-fade-in max-w-md">
+            <Library
+              className="w-16 h-16 text-accent mx-auto opacity-80 animate-pulse"
+              strokeWidth={1.5}
+            />
+            <div className="space-y-2">
+              <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+              <p className="text-2xl text-primary font-heading font-bold">
+                Processing Your Reading Library
+              </p>
+              < p className = "text-lg text-muted" > We're analyzing your Goodreads export to personalize your recommendations...</p>
+            </div>
+            <Button
+              onClick={handleSkipUpload}
+              variant="outline"
+              className="border-primary/30 text-primary hover:bg-primary/5 font-semibold"
+            >
+              <SkipForward className="w-4 h-4 mr-2" />
+              Skip Upload
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (phase === "csv_ready") {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center space-y-6 opacity-0 animate-fade-in max-w-md">
+            <CheckCircle
+              className="w-16 h-16 text-success mx-auto opacity-80"
+              strokeWidth={1.5}
+            />
+            <div className="space-y-2">
+              <p className="text-2xl text-primary font-heading font-bold">
+                Library Ready!
+              </p>
+              <p className="text-lg text-muted">
+                Your reading history has been processed. Ready to find your next great read.
+              </p>
+            </div>
+            <Button
+              onClick={handleGetRecommendations}
+              className="bg-primary hover:bg-primary/90 text-cream font-bold btn-hover-lift"
+            >
+              <BookOpen className="w-4 h-4 mr-2" />
+              Get Recommendations
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (phase === "csv_failed") {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="max-w-md text-center space-y-6 paper-card p-8 rounded-card opacity-0 animate-fade-in-up">
+            <BookOpen
+              className="w-16 h-16 text-muted mx-auto opacity-50"
+              strokeWidth={1.5}
+            />
+            <h2 className="text-h2 text-primary">
+              CSV Processing Failed
+            </h2>
+            <p className="text-muted">
+              We couldn't process your Goodreads export. You can still get recommendations based on your preferences.
+            </p>
+            <Button
+              onClick={handleContinueWithoutCsv}
+              className="bg-primary hover:bg-primary/90 text-cream font-bold btn-hover-lift"
+            >
+              Continue Without CSV
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
   }
 
   if (isLoading) {
