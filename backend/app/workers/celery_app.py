@@ -39,7 +39,7 @@ celery_app.conf.update(
 
     # Worker settings
     worker_prefetch_multiplier=1,  # Prevent worker from grabbing multiple tasks
-    worker_max_tasks_per_child=1000,  # Restart worker after 1000 tasks (memory cleanup)
+    worker_max_tasks_per_child=10,  # Restart worker after 1000 tasks (memory cleanup)
 
     # Retry settings
     task_acks_late=True,  # Acknowledge task after completion
