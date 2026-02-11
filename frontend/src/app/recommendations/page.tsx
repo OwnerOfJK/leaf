@@ -141,7 +141,7 @@ export default function RecommendationsPage() {
     if (hasLoadedRef.current) {
       console.log("[Recommendations] Already loaded, checking for status changes");
       // If CSV just completed, load recommendations
-      if (csvUploaded && csvStatus === "completed") {
+      if (csvStatus === "completed") {
         console.log("[Recommendations] CSV completed after loading - loading recommendations");
         stopPolling();
         loadRecommendations();
@@ -151,19 +151,19 @@ export default function RecommendationsPage() {
 
     hasLoadedRef.current = true;
 
-    if (!csvUploaded || csvStatus === "none") {
-      console.log("[Recommendations] No CSV or status is none - loading recommendations");
-      loadRecommendations();
-    } else if (csvStatus === "completed") {
-      console.log("[Recommendations] CSV completed - loading recommendations");
-      loadRecommendations();
-    } else if (csvStatus === "processing" || csvStatus === "pending") {
+    if (csvStatus === "processing" || csvStatus === "pending") {
       console.log("[Recommendations] CSV processing - starting poll");
       setPhase("waiting_for_csv");
       startPolling();
     } else if (csvStatus === "failed") {
       console.log("[Recommendations] CSV failed");
       setPhase("csv_failed");
+    } else if (csvStatus === "completed") {
+      console.log("[Recommendations] CSV completed - loading recommendations");
+      loadRecommendations();
+    } else {
+      console.log("[Recommendations] No CSV or status is none - loading recommendations");
+      loadRecommendations();
     }
   }, [session.session_id, session.csv_status, session.csv_uploaded, router, loadRecommendations, startPolling]);
 

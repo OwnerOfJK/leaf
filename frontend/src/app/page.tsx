@@ -125,7 +125,6 @@ export default function Home() {
       }
 
       // Start polling for CSV processing
-      session.setCsvUploaded(true);
       session.setCsvStatus("processing");
       await pollCsvStatus(response.session_id);
     } catch (error) {
@@ -172,7 +171,6 @@ export default function Home() {
         if (csvFile || response.status === "processing_csv") {
           setCsvUploadStatus("uploading");
           setCsvProgress(0);
-          session.setCsvUploaded(true);
           session.setCsvStatus("processing");
           await pollCsvStatus(sessionId);
         }
