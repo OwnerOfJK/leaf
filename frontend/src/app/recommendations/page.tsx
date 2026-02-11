@@ -82,17 +82,11 @@ export default function RecommendationsPage() {
   }, [session.session_id]);
 
   const startPolling = useCallback(() => {
-    console.log("[Recommendations] startPolling called", { session_id: session.session_id });
-    if (!session.session_id) {
-      console.log("[Recommendations] No session_id, aborting poll");
-      return;
-    }
+    if (!session.session_id) return;
 
     const poll = async () => {
-      console.log("[Recommendations] Polling CSV status...");
       try {
         const status = await apiClient.getSessionStatus(session.session_id!);
-        console.log("[Recommendations] CSV status poll:", status);
         setBooksProcessed(status.books_processed);
         setBooksTotal(status.books_total);
 
