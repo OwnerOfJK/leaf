@@ -16,8 +16,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    mem_limit: 3g
-    mem_reservation: 2g
+    mem_limit: 2g
+    mem_reservation: 1g
     shm_size: 256mb
 
   redis:
@@ -34,8 +34,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    mem_limit: 768m
-    mem_reservation: 512m
+    mem_limit: 512m
+    mem_reservation: 384m
 
   backend:
     build:
@@ -73,8 +73,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    mem_limit: 1g
-    mem_reservation: 512m
+    mem_limit: 768m
+    mem_reservation: 384m
 
   celery-worker-1:
     build:
@@ -182,8 +182,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    mem_limit: 1g
-    mem_reservation: 512m
+    mem_limit: 768m
+    mem_reservation: 384m
 
 networks:
   leaf-network:
